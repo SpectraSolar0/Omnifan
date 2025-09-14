@@ -18,6 +18,18 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("Bot actif !");
+});
+
+app.listen(port, () => {
+  console.log(`🌐 Serveur web actif sur le port ${port}`);
+});
+
 // ----------------------
 // PREFIX & COMMANDES
 // ----------------------
