@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials, ActivityType } = require("discord.js");
+const { Client, GatewayIntentBits, Partials, ActivityType, PermissionsBitField } = require("discord.js");
 const fs = require("fs");
 require("dotenv").config();
 
@@ -57,9 +57,14 @@ for (const file of commandFiles) {
 const ALLOWED_IDS = ["1105601228047654912", "991295146215882872"];
 
 // ----------------------
+// SALON DE LOGS
+// ----------------------
+const LOG_CHANNEL_ID = "1416538327682777088"; // Remplace par ton ID
+
+// ----------------------
 // CLIENT PRÊT
 // ----------------------
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
   client.user.setPresence({
@@ -69,6 +74,54 @@ client.once("ready", () => {
 
   const setupLogger = require("./logger");
   setupLogger(client);
+
+  // Sécuriser le salon de logs au niveau des permissions
+  const guild = client.guilds.cache.first();
+  const logChannel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+  if (logChannel) {
+    logChannel.permissionOverwrites.set([
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionsBitField.Flags.ManageMessages],
+      },
+      {
+        id: client.user.id,
+        allow: [PermissionsBitField.Flags.ManageMessages],
+      },
+    ]);
+  }
+});
+
+// ----------------------
+// PROTECTION DES MESSAGES DU BOT DANS LES LOGS
+// ----------------------
+client.on("messageDelete", async (message) => {
+  try {
+    if (!message.guild) return;
+    if (message.channel.id !== LOG_CHANNEL_ID) return;
+
+    const logChannel = await message.guild.channels.fetch(LOG_CHANNEL_ID);
+    if (!logChannel) return;
+
+    // Restaurer les messages du bot immédiatement
+    if (message.author.id === client.user.id) {
+      let content = message.content || "[Message sans contenu]";
+      let attachments = message.attachments.map((a) => a.url).join("\n");
+      let restoreMessage = `🔄 Message du bot restauré:\n${content}`;
+      if (attachments) restoreMessage += `\n**Pièces jointes:**\n${attachments}`;
+      await logChannel.send(restoreMessage);
+    } else {
+      // Logger les messages supprimés par un utilisateur
+      let content = message.content || "[Message sans contenu]";
+      let author = message.author ? message.author.tag : "Inconnu";
+      let attachments = message.attachments.map((a) => a.url).join("\n");
+      let logMessage = `🛑 Message supprimé par un utilisateur!\n**Auteur:** ${author}\n**Contenu:** ${content}`;
+      if (attachments) logMessage += `\n**Pièces jointes:**\n${attachments}`;
+      await logChannel.send(logMessage);
+    }
+  } catch (err) {
+    console.error("Erreur lors de la gestion de message supprimé:", err);
+  }
 });
 
 // ----------------------
