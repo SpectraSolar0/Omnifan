@@ -4,7 +4,7 @@ module.exports = {
   name: "shutdown",
   description: "Éteint le bot (commande réservée au propriétaire).",
   execute: async (client, message, args) => {
-    const ownerId = "TON_ID_DISCORD"; // 🔴 remplace par ton ID
+    const ownerId = "991295146215882872"; // 🔴 remplace par ton ID
 
     if (message.author.id !== ownerId) {
       return message.reply("⛔ Tu n'as pas la permission d'éteindre le bot !");
