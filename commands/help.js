@@ -18,7 +18,7 @@ module.exports = {
           )
           .join("\n")
       )
-      .setFooter({ text: `Commandes visibles uniquement pour ${message.author.tag}` })
+      .setFooter({ text: `Demandé par ${message.author.tag}` })
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
