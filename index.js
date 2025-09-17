@@ -1,6 +1,3 @@
-Rajoute juste ce qu'il faut ou corrige mmon index  
-
-
 const { Client, GatewayIntentBits, Partials, ActivityType, PermissionsBitField } = require("discord.js");
 const fs = require("fs");
 require("dotenv").config();
