@@ -1,6 +1,6 @@
 module.exports = {
   name: "clear",
-  description: "Supprime un nombre de messages spécifié.",
+  description: "Supprime un nombre de messages spécifié. - admin only",
   adminOnly: true,
   async execute(message, args) {
     // Vérification des permissions

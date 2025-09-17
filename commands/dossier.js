@@ -11,7 +11,7 @@ if (fs.existsSync(foldersPath)) {
 
 module.exports = {
   name: "dossier",
-  description: "Ouvre un panneau pour naviguer dans les dossiers des utilisateurs.",
+  description: "Ouvre un panneau pour naviguer dans les dossiers des utilisateurs. - admin only",
   adminOnly: true,
   execute: async (message, args, client) => {
     let currentUser = null;

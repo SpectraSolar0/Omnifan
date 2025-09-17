@@ -1,6 +1,6 @@
 module.exports = {
   name: "rename",
-  description: "Renomme le salon actuel avec le nom spécifié.",
+  description: "Renomme le salon actuel avec le nom spécifié. - admin only",
   adminOnly: true,
   async execute(message, args) {
     // Vérification des permissions

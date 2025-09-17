@@ -4,7 +4,7 @@ const { ActivityType } = require("discord.js");
 
 module.exports = {
   name: "lockdown",
-  description: "Ferme l'accès à tous les salons et sauvegarde les permissions.",
+  description: "Ferme l'accès à tous les salons et sauvegarde les permissions. - admin only",
   adminOnly: true,
   async execute(message, args, client) {
     if (!message.member.permissions.has("Administrator")) {

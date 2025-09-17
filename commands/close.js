@@ -2,7 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: "close",
-  description: "Envoie un bouton pour fermer la plainte.",
+  description: "Envoie un bouton pour fermer la plainte. - admin only",
   adminOnly: true,
   async execute(message, args) {
     if (!message.member.permissions.has("ManageChannels")) {

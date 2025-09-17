@@ -5,7 +5,7 @@ const configPath = path.join(__dirname, "../logs_config.json");
 
 module.exports = {
   name: "setlogs",
-  description: "Définit le salon des logs.",
+  description: "Définit le salon des logs. - admin only",
   adminOnly: true,
   async execute(message, args) {
     if (!message.member.permissions.has("Administrator")) {

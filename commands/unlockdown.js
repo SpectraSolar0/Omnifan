@@ -4,7 +4,7 @@ const { ActivityType } = require("discord.js");
 
 module.exports = {
   name: "unlockdown",
-  description: "Rouvre tous les salons et supprime le salon urgence.",
+  description: "Rouvre tous les salons et supprime le salon urgence. - admin only",
   adminOnly: true,
   async execute(message, args, client) {
     if (!message.member.permissions.has("Administrator")) {

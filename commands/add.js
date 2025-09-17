@@ -1,6 +1,6 @@
 module.exports = {
   name: "add",
-  description: "Ajoute un membre à une plainte (salon actuel).",
+  description: "Ajoute un membre à une plainte (salon actuel) - admin only.",
   adminOnly: true,
   async execute(message, args) {
     if (!message.member.permissions.has("ManageChannels")) {

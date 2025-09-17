@@ -1,7 +1,7 @@
 module.exports = {
   name: "boom",
   description: "Fait BOOM !",
-  adminOnly: true,
+  adminOnly: false,
   execute(message, args) {
     message.channel.send("💥 BOOM !");
   },

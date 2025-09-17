@@ -2,7 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: "plaintepanel",
-  description: "Envoie un panneau pour créer une plainte.",
+  description: "Envoie un panneau pour créer une plainte. - admin only",
   adminOnly: true,
   async execute(message, args) {
     const row = new ActionRowBuilder()
