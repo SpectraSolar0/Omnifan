@@ -46,7 +46,7 @@ module.exports = {
 
       // ✨ Remettre le statut
       await client.user.setPresence({
-        activities: [{ name: "Regarde les révolutions", type: ActivityType.Watching }],
+        activities: [{ name: "les révolutions 👀", type: ActivityType.Watching }],
         status: "online"
       });
 

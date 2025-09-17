@@ -64,7 +64,7 @@ module.exports = {
 
       // 7️⃣ Changer le statut
       await client.user.setPresence({
-        activities: [{ name: "l'état d'alerte", type: ActivityType.Watching }],
+        activities: [{ name: "l'état d'alerte 🚨", type: ActivityType.Watching }],
         status: "dnd"
       });
 
