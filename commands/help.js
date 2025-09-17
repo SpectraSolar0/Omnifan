@@ -3,6 +3,7 @@ const { EmbedBuilder } = require("discord.js");
 module.exports = {
   name: "help",
   description: "Affiche toutes les commandes disponibles",
+  adminOnly: false,
   async execute(message, args, client) {
     const embed = new EmbedBuilder()
       .setTitle("📜 Commandes du bot")

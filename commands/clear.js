@@ -1,6 +1,7 @@
 module.exports = {
   name: "clear",
   description: "Supprime un nombre de messages spécifié.",
+  adminOnly: true,
   async execute(message, args) {
     // Vérification des permissions
     if (!message.member.permissions.has("ManageMessages")) {

@@ -1,3 +1,6 @@
+Rajoute juste ce qu'il faut ou corrige mmon index  
+
+
 const { Client, GatewayIntentBits, Partials, ActivityType, PermissionsBitField } = require("discord.js");
 const fs = require("fs");
 require("dotenv").config();
@@ -48,7 +51,9 @@ const commandFiles = fs.readdirSync("./commands").filter((file) => file.endsWith
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
   const enabled = commandStates[command.name] ?? true;
-  client.commands.set(command.name, { command, enabled });
+
+  // Si la commande n’a pas d’option adminOnly, on la met par défaut à false
+  client.commands.set(command.name, { command: { adminOnly: false, ...command }, enabled });
 }
 
 // ----------------------
@@ -103,7 +108,6 @@ client.on("messageDelete", async (message) => {
     const logChannel = await message.guild.channels.fetch(LOG_CHANNEL_ID);
     if (!logChannel) return;
 
-    // Restaurer les messages du bot immédiatement
     if (message.author.id === client.user.id) {
       let content = message.content || "[Message sans contenu]";
       let attachments = message.attachments.map((a) => a.url).join("\n");
@@ -111,7 +115,6 @@ client.on("messageDelete", async (message) => {
       if (attachments) restoreMessage += `\n**Pièces jointes:**\n${attachments}`;
       await logChannel.send(restoreMessage);
     } else {
-      // Logger les messages supprimés par un utilisateur
       let content = message.content || "[Message sans contenu]";
       let author = message.author ? message.author.tag : "Inconnu";
       let attachments = message.attachments.map((a) => a.url).join("\n");
@@ -131,10 +134,6 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
 
-  if (!ALLOWED_IDS.includes(message.author.id)) {
-    return message.reply("❌ Vous n'êtes pas autorisé à utiliser les commandes de ce bot !");
-  }
-
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
 
@@ -142,6 +141,11 @@ client.on("messageCreate", async (message) => {
   if (!cmdObj) return;
 
   if (!cmdObj.enabled) return message.reply("❌ Cette commande est désactivée !");
+
+  // Vérifie si adminOnly et si l'utilisateur est autorisé
+  if (cmdObj.command.adminOnly && !ALLOWED_IDS.includes(message.author.id)) {
+    return message.reply("❌ Vous n'avez pas la permission d'utiliser cette commande !");
+  }
 
   try {
     await cmdObj.command.execute(message, args, client);
