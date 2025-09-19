@@ -84,7 +84,68 @@ module.exports = (client) => {
   });
 
   // -----------------------
-  // VOICE STATE UPDATE
+  // MEMBRE REJOINT
+  // -----------------------
+  client.on(Events.GuildMemberAdd, async (member) => {
+    const logChannel = await getLogChannel(member.guild);
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("👋 Nouveau membre")
+      .setColor(0x2ECC71)
+      .setDescription(`${member.user.tag} a rejoint le serveur.`)
+      .setThumbnail(member.user.displayAvatarURL())
+      .setTimestamp();
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // -----------------------
+  // MEMBRE QUITTE
+  // -----------------------
+  client.on(Events.GuildMemberRemove, async (member) => {
+    const logChannel = await getLogChannel(member.guild);
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("🚪 Membre parti")
+      .setColor(0xE67E22)
+      .setDescription(`${member.user.tag} a quitté le serveur.`)
+      .setThumbnail(member.user.displayAvatarURL())
+      .setTimestamp();
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // -----------------------
+  // AJOUT / RETRAIT DE RÔLES SUR UN MEMBRE
+  // -----------------------
+  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    const logChannel = await getLogChannel(newMember.guild);
+    if (!logChannel) return;
+
+    const oldRoles = oldMember.roles.cache.map(r => r.name);
+    const newRoles = newMember.roles.cache.map(r => r.name);
+
+    const added = newRoles.filter(r => !oldRoles.includes(r));
+    const removed = oldRoles.filter(r => !newRoles.includes(r));
+
+    if (!added.length && !removed.length) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("🎭 Rôles modifiés sur un membre")
+      .setColor(0x3498DB)
+      .setDescription(`Utilisateur : ${newMember.user.tag}`)
+      .setTimestamp();
+
+    if (added.length) embed.addFields({ name: "Ajoutés", value: safe(added.join(", ")) });
+    if (removed.length) embed.addFields({ name: "Retirés", value: safe(removed.join(", ")) });
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // -----------------------
+  // VOIX
   // -----------------------
   client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     const guild = newState.guild || oldState.guild;
@@ -92,18 +153,18 @@ module.exports = (client) => {
     const logChannel = await getLogChannel(guild);
     if (!logChannel) return;
 
-    // Déconnexion vocale forcée
+    // Déconnexion vocale
     if (oldState.channelId && !newState.channelId) {
       let executor = "Inconnu";
       try {
-        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberMove, limit: 5 });
+        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberDisconnect, limit: 1 });
         const entry = logs.entries.first();
         if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
       } catch {}
 
       const embed = new EmbedBuilder()
-        .setTitle("❌ Déconnexion vocale forcée")
-        .setColor(0xE67E22)
+        .setTitle("❌ Déconnexion vocale")
+        .setColor(0xE74C3C)
         .addFields(
           { name: "Utilisateur", value: oldState.member?.user?.tag ?? "Inconnu", inline: true },
           { name: "Salon", value: oldState.channel?.name ?? "Inconnu", inline: true },
@@ -118,7 +179,7 @@ module.exports = (client) => {
     if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       let executor = "Inconnu";
       try {
-        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberMove, limit: 5 });
+        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberMove, limit: 1 });
         const entry = logs.entries.first();
         if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
       } catch {}
@@ -127,10 +188,10 @@ module.exports = (client) => {
         .setTitle("🔄 Déplacement vocal")
         .setColor(0x2980B9)
         .addFields(
-          { name: "Utilisateur déplacé", value: oldState.member?.user?.tag ?? "Inconnu", inline: true },
+          { name: "Utilisateur", value: oldState.member?.user?.tag ?? "Inconnu", inline: true },
           { name: "De", value: oldState.channel?.name ?? "Inconnu", inline: true },
           { name: "Vers", value: newState.channel?.name ?? "Inconnu", inline: true },
-          { name: "Déplacé par", value: executor, inline: true }
+          { name: "Par", value: executor, inline: true }
         )
         .setTimestamp();
 
@@ -139,28 +200,29 @@ module.exports = (client) => {
   });
 
   // -----------------------
-  // ROLES
+  // CRÉATION / SUPPRESSION / MODIFICATION DE RÔLES
   // -----------------------
   client.on(Events.GuildRoleCreate, async (role) => {
     const logChannel = await getLogChannel(role.guild);
     if (!logChannel) return;
 
-    let executor = "Inconnu";
-    try {
-      const logs = await role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleCreate, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-    } catch {}
-
-    const perms = new PermissionsBitField(role.permissions).toArray().join(", ");
     const embed = new EmbedBuilder()
       .setTitle("➕ Rôle créé")
       .setColor(0x2ECC71)
-      .addFields(
-        { name: "Nom", value: role.name, inline: true },
-        { name: "Créé par", value: executor, inline: true },
-        { name: "Permissions", value: safe(perms) }
-      )
+      .addFields({ name: "Nom", value: role.name, inline: true })
+      .setTimestamp();
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  client.on(Events.GuildRoleDelete, async (role) => {
+    const logChannel = await getLogChannel(role.guild);
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("🗑️ Rôle supprimé")
+      .setColor(0xE74C3C)
+      .addFields({ name: "Nom", value: role.name, inline: true })
       .setTimestamp();
 
     logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -170,32 +232,14 @@ module.exports = (client) => {
     const logChannel = await getLogChannel(newRole.guild);
     if (!logChannel) return;
 
-    let executor = "Inconnu";
-    try {
-      const logs = await newRole.guild.fetchAuditLogs({ type: AuditLogEvent.RoleUpdate, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-    } catch {}
+    const fields = [];
 
-    const fields = [{ name: "Modifié par", value: executor, inline: true }];
-
-    // Nom modifié
     if (oldRole.name !== newRole.name) {
       fields.push({ name: "Nom avant", value: safe(oldRole.name), inline: true });
       fields.push({ name: "Nom après", value: safe(newRole.name), inline: true });
     }
 
-    // Permissions modifiées
-    const oldPerms = new PermissionsBitField(oldRole.permissions);
-    const newPerms = new PermissionsBitField(newRole.permissions);
-
-    const added = new PermissionsBitField(newPerms.bitfield & ~oldPerms.bitfield).toArray();
-    const removed = new PermissionsBitField(oldPerms.bitfield & ~newPerms.bitfield).toArray();
-
-    if (added.length) fields.push({ name: "Permissions activées", value: safe(added.join(", ")) });
-    if (removed.length) fields.push({ name: "Permissions désactivées", value: safe(removed.join(", ")) });
-
-    if (fields.length === 1) return;
+    if (!fields.length) return;
 
     const embed = new EmbedBuilder()
       .setTitle("⚙️ Rôle modifié")
@@ -206,76 +250,47 @@ module.exports = (client) => {
     logChannel.send({ embeds: [embed] }).catch(() => {});
   });
 
-  client.on(Events.GuildRoleDelete, async (role) => {
-    const logChannel = await getLogChannel(role.guild);
-    if (!logChannel) return;
-
-    let executor = "Inconnu";
-    try {
-      const logs = await role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleDelete, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-    } catch {}
-
-    const perms = new PermissionsBitField(role.permissions).toArray().join(", ");
-    const embed = new EmbedBuilder()
-      .setTitle("🗑️ Rôle supprimé")
-      .setColor(0xE74C3C)
-      .addFields(
-        { name: "Nom", value: role.name, inline: true },
-        { name: "Supprimé par", value: executor, inline: true },
-        { name: "Permissions", value: safe(perms) }
-      )
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
   // -----------------------
-  // SALONS
+  // CRÉATION / SUPPRESSION / MODIFICATION DE SALONS
   // -----------------------
   client.on(Events.ChannelCreate, async (channel) => {
-    if (!channel.guild) return;
     const logChannel = await getLogChannel(channel.guild);
     if (!logChannel) return;
-
-    let who = "Inconnu";
-    try {
-      const logs = await channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelCreate, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) who = entry.executor?.tag ?? "Inconnu";
-    } catch {}
 
     const embed = new EmbedBuilder()
       .setTitle("📂 Salon créé")
       .setColor(0x2ECC71)
-      .addFields(
-        { name: "Nom", value: channel.name || "Inconnu", inline: true },
-        { name: "Créé par", value: who, inline: true }
-      )
+      .addFields({ name: "Nom", value: channel.name, inline: true })
       .setTimestamp();
 
     logChannel.send({ embeds: [embed] }).catch(() => {});
   });
 
   client.on(Events.ChannelDelete, async (channel) => {
-    if (!channel.guild) return;
     const logChannel = await getLogChannel(channel.guild);
     if (!logChannel) return;
-
-    let who = "Inconnu";
-    try {
-      const logs = await channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelDelete, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) who = entry.executor?.tag ?? "Inconnu";
-    } catch {}
 
     const embed = new EmbedBuilder()
       .setTitle("🗑️ Salon supprimé")
       .setColor(0xE74C3C)
+      .addFields({ name: "Nom", value: channel.name, inline: true })
+      .setTimestamp();
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
+    const logChannel = await getLogChannel(newChannel.guild);
+    if (!logChannel) return;
+
+    if (oldChannel.name === newChannel.name) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("⚙️ Salon modifié")
+      .setColor(0xF39C12)
       .addFields(
-        { name: "Nom", value: channel.name || "Inconnu", inline: true },
-        { name: "Supprimé par", value: who, inline: true }
+        { name: "Nom avant", value: safe(oldChannel.name), inline: true },
+        { name: "Nom après", value: safe(newChannel.name), inline: true }
       )
       .setTimestamp();
 
@@ -283,26 +298,16 @@ module.exports = (client) => {
   });
 
   // -----------------------
-  // BANS
+  // BANS ET UNBANS
   // -----------------------
   client.on(Events.GuildBanAdd, async (ban) => {
     const logChannel = await getLogChannel(ban.guild);
     if (!logChannel) return;
 
-    let who = "Inconnu";
-    try {
-      const logs = await ban.guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanAdd, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) who = entry.executor?.tag ?? "Inconnu";
-    } catch {}
-
     const embed = new EmbedBuilder()
       .setTitle("🔨 Utilisateur banni")
       .setColor(0x8E44AD)
-      .addFields(
-        { name: "Utilisateur", value: ban.user.tag, inline: true },
-        { name: "Par", value: who, inline: true }
-      )
+      .addFields({ name: "Utilisateur", value: ban.user.tag, inline: true })
       .setTimestamp();
 
     logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -312,83 +317,10 @@ module.exports = (client) => {
     const logChannel = await getLogChannel(ban.guild);
     if (!logChannel) return;
 
-    let who = "Inconnu";
-    try {
-      const logs = await ban.guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanRemove, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) who = entry.executor?.tag ?? "Inconnu";
-    } catch {}
-
     const embed = new EmbedBuilder()
-      .setTitle("✅ Utilisateur unbanni")
+      .setTitle("✅ Utilisateur débanni")
       .setColor(0x27AE60)
-      .addFields(
-        { name: "Utilisateur", value: ban.user.tag, inline: true },
-        { name: "Par", value: who, inline: true }
-      )
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  // -----------------------
-  // SALONS MODIFIÉS
-  // -----------------------
-  client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
-    if (!oldChannel.guild) return;
-    const logChannel = await getLogChannel(oldChannel.guild);
-    if (!logChannel) return;
-
-    let executor = "Inconnu";
-    try {
-      const logs = await oldChannel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelUpdate, limit: 1 });
-      const entry = logs.entries.first();
-      if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-    } catch {}
-
-    const fields = [{ name: "Modifié par", value: executor, inline: true }];
-
-    // Comparer le nom
-    if (oldChannel.name !== newChannel.name) {
-      fields.push({ name: "Nom avant", value: safe(oldChannel.name), inline: true });
-      fields.push({ name: "Nom après", value: safe(newChannel.name), inline: true });
-    }
-
-    // Comparer le type
-    if (oldChannel.type !== newChannel.type) {
-      fields.push({ name: "Type avant", value: oldChannel.type, inline: true });
-      fields.push({ name: "Type après", value: newChannel.type, inline: true });
-    }
-
-    // Comparer les permissions pour chaque overwrite
-    const oldPerms = oldChannel.permissionOverwrites.cache;
-    const newPerms = newChannel.permissionOverwrites.cache;
-
-    oldPerms.forEach((oldOverwrite, id) => {
-      const newOverwrite = newPerms.get(id);
-      if (!newOverwrite) return;
-      const oldAllow = new PermissionsBitField(oldOverwrite.allow).toArray();
-      const newAllow = new PermissionsBitField(newOverwrite.allow).toArray();
-      const oldDeny = new PermissionsBitField(oldOverwrite.deny).toArray();
-      const newDeny = new PermissionsBitField(newOverwrite.deny).toArray();
-
-      const added = newAllow.filter(p => !oldAllow.includes(p));
-      const removed = oldAllow.filter(p => !newAllow.includes(p));
-      const deniedAdded = newDeny.filter(p => !oldDeny.includes(p));
-      const deniedRemoved = oldDeny.filter(p => !newDeny.includes(p));
-
-      if (added.length) fields.push({ name: `Permissions activées pour <@&${id}>`, value: safe(added.join(", ")) });
-      if (removed.length) fields.push({ name: `Permissions désactivées pour <@&${id}>`, value: safe(removed.join(", ")) });
-      if (deniedAdded.length) fields.push({ name: `Permissions refusées pour <@&${id}>`, value: safe(deniedAdded.join(", ")) });
-      if (deniedRemoved.length) fields.push({ name: `Permissions retirées pour <@&${id}>`, value: safe(deniedRemoved.join(", ")) });
-    });
-
-    if (fields.length === 1) return; // rien n’a changé
-
-    const embed = new EmbedBuilder()
-      .setTitle("⚙️ Salon modifié")
-      .setColor(0xF39C12)
-      .addFields(fields)
+      .addFields({ name: "Utilisateur", value: ban.user.tag, inline: true })
       .setTimestamp();
 
     logChannel.send({ embeds: [embed] }).catch(() => {});
