@@ -2,7 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("
 
 module.exports = {
   name: "plaintepanel",
-  description: "Affiche le panneau des plaintes.",
+  description: "Affiche le panneau des plaintes. - admin only",
   adminOnly: true,
   async execute(message) {
     // Embed pour le panneau des plaintes
