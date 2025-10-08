@@ -10,11 +10,25 @@ module.exports = {
       "https://i.imgur.com/MJ7kOyd.jpeg",
     ];
 
+    const susTexts = [
+      "Quelque chose ne va pas ici... 👀",
+      "C’est vraiment suspicieux ! 🔍",
+      "Hmm… je sens la trahison… 😳",
+      "Les imposteurs sont parmi nous ! 🚨",
+      "Attention, ça sent le sus ! 🕵️",
+      "Quelque chose cloche ici… 😬",
+      "Hmm… je ne fais pas confiance… 😏",
+    ];
+
+    // Choisir un GIF/image aléatoire
     const img = susImages[Math.floor(Math.random() * susImages.length)];
+
+    // Choisir un texte aléatoire
+    const randomText = susTexts[Math.floor(Math.random() * susTexts.length)];
 
     const embed = new EmbedBuilder()
       .setTitle("That's kinda sus...")
-      .setDescription(`**${message.author.username}** a détecté quelque chose de louche ! 👀`)
+      .setDescription(randomText)
       .setImage(img)
       .setColor(0xff5c5c)
       .setFooter({ text: "Sus detector™" })
