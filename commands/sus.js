@@ -5,9 +5,9 @@ module.exports = {
   description: "Détecte quelque chose de louche... 😳",
   async execute(message) {
     const susImages = [
-      "https://i.imgur.com/7kM0yVY.png",
-      "https://i.imgur.com/0Z8Yq1J.gif",
-      "https://i.imgur.com/MJ7kOyd.jpeg",
+      "https://tenor.com/view/sus-suspicious-hmm-hmmmm-hmmm-gif-24729433",
+      "https://tenor.com/view/fry-suspicious-futurama-gif-13382909",
+      "https://tenor.com/view/side-eye-dog-suspicious-look-suspicious-doubt-dog-doubt-gif-23680990",
     ];
 
     const susTexts = [
