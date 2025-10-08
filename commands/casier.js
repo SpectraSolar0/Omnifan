@@ -1,4 +1,4 @@
-const fs = require("fs"); // <- Import manquant
+const fs = require("fs");
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -38,16 +38,23 @@ module.exports = {
       "Mr Aldo",
     ];
 
-    // === Étape 1 : Menu principal ===
-    const row = new ActionRowBuilder();
-    membres.forEach((nom) => {
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`personne_${nom}`)
-          .setLabel(nom)
-          .setStyle(ButtonStyle.Primary)
-      );
-    });
+    // === Étape 1 : Menu principal avec plusieurs ActionRow ===
+    const rows = [];
+    const boutonsParLigne = 5;
+
+    for (let i = 0; i < membres.length; i += boutonsParLigne) {
+      const row = new ActionRowBuilder();
+      const chunk = membres.slice(i, i + boutonsParLigne);
+      chunk.forEach((nom) => {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`personne_${nom}`)
+            .setLabel(nom)
+            .setStyle(ButtonStyle.Primary)
+        );
+      });
+      rows.push(row);
+    }
 
     const embedMenu = new EmbedBuilder()
       .setTitle("📁 Menu des casiers judiciaires")
@@ -60,7 +67,7 @@ module.exports = {
     try {
       menuMessage = await message.channel.send({
         embeds: [embedMenu],
-        components: [row],
+        components: rows,
       });
     } catch (err) {
       console.error("Erreur lors de l'envoi du menu principal :", err);
