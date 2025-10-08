@@ -13,7 +13,7 @@ module.exports = {
       const collectedChannel = await message.channel.awaitMessages({
         filter,
         max: 1,
-        time: 60000,
+        time: 900000,
         errors: ["time"],
       });
       const channelMention = collectedChannel.first().mentions.channels.first();
