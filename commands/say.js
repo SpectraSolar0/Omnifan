@@ -25,7 +25,7 @@ module.exports = {
       const collectedTitle = await message.channel.awaitMessages({
         filter,
         max: 1,
-        time: 60000,
+        time: 900000,
         errors: ["time"],
       });
       const title = collectedTitle.first().content;
@@ -35,7 +35,7 @@ module.exports = {
       const collectedContent = await message.channel.awaitMessages({
         filter,
         max: 1,
-        time: 60000,
+        time: 900000,
         errors: ["time"],
       });
       const content = collectedContent.first().content;
