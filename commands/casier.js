@@ -1,3 +1,11 @@
+const fs = require("fs"); // <- Import manquant
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} = require("discord.js");
+
 module.exports = {
   name: "casier",
   description: "Affiche et gère les casiers judiciaires des membres.",
@@ -26,7 +34,7 @@ module.exports = {
       "Mr Alhumam",
       "Mr Cyprien",
       "Mr Justin",
-      "MrNoa",
+      "Mr Noa",
       "Mr Aldo",
     ];
 
@@ -43,13 +51,21 @@ module.exports = {
 
     const embedMenu = new EmbedBuilder()
       .setTitle("📁 Menu des casiers judiciaires")
-      .setDescription("Choisis une personne pour consulter ou modifier ses casiers :")
+      .setDescription(
+        "Choisis une personne pour consulter ou modifier ses casiers :"
+      )
       .setColor(0x5865f2);
 
-    const menuMessage = await message.channel.send({
-      embeds: [embedMenu],
-      components: [row],
-    });
+    let menuMessage;
+    try {
+      menuMessage = await message.channel.send({
+        embeds: [embedMenu],
+        components: [row],
+      });
+    } catch (err) {
+      console.error("Erreur lors de l'envoi du menu principal :", err);
+      return;
+    }
 
     const collector = menuMessage.createMessageComponentCollector({
       time: 300000, // 5 minutes
@@ -95,10 +111,16 @@ module.exports = {
               : "❌ Aucun casier pour cette personne.\nTu peux en ajouter un avec le bouton ci-dessous."
           );
 
-        await interaction.update({
-          embeds: [embedPerso],
-          components: [casierRow],
-        });
+        try {
+          await interaction.update({
+            embeds: [embedPerso],
+            components: [casierRow],
+          });
+        } catch (err) {
+          console.warn(
+            "⚠️ Impossible de modifier le message pour afficher les casiers (message supprimé ou expiré)."
+          );
+        }
       }
 
       // === Étape 3 : Ajouter un casier ===
@@ -107,18 +129,23 @@ module.exports = {
         const filter = (m) => m.author.id === message.author.id;
 
         const ask = async (question) => {
-          await interaction.followUp({ content: question, ephemeral: true });
-          const collected = await message.channel.awaitMessages({
-            filter,
-            max: 1,
-            time: 60000,
-            errors: ["time"],
-          });
-          return collected.first().content;
+          try {
+            await interaction.followUp({ content: question, ephemeral: true });
+            const collected = await message.channel.awaitMessages({
+              filter,
+              max: 1,
+              time: 60000,
+              errors: ["time"],
+            });
+            return collected.first().content;
+          } catch (err) {
+            return null;
+          }
         };
 
         try {
           const date = await ask("📅 Date du casier (ex: 08/10/2025) :");
+          if (!date) throw new Error("Temps écoulé");
           const infractions = await ask("🚨 Infractions :");
           const details = await ask("📝 Détails :");
           const sanction = await ask("⛓️ Sanction :");
@@ -157,7 +184,12 @@ module.exports = {
       // === Étape 4 : Afficher un casier ===
       if (id.startsWith("casier_")) {
         const [, nom, casierId] = id.split("_");
-        const casier = casiersData[nom].find((c) => c.id == casierId);
+        const casier = casiersData[nom]?.find((c) => c.id == casierId);
+        if (!casier)
+          return interaction.reply({
+            content: "❌ Casier introuvable.",
+            ephemeral: true,
+          });
 
         const embedCasier = new EmbedBuilder()
           .setTitle(`📂 Casier judiciaire – ${nom}`)
@@ -180,10 +212,16 @@ module.exports = {
             .setStyle(ButtonStyle.Danger)
         );
 
-        await interaction.update({
-          embeds: [embedCasier],
-          components: [rowDelete],
-        });
+        try {
+          await interaction.update({
+            embeds: [embedCasier],
+            components: [rowDelete],
+          });
+        } catch (err) {
+          console.warn(
+            "⚠️ Impossible de modifier le message pour afficher le casier (message supprimé ou expiré)."
+          );
+        }
       }
 
       // === Étape 5 : Supprimer un casier ===
@@ -199,15 +237,29 @@ module.exports = {
         casiersData[nom] = casiersData[nom].filter((c) => c.id != casierId);
         fs.writeFileSync(dataPath, JSON.stringify(casiersData, null, 2));
 
-        await interaction.update({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(`🗑️ Casier supprimé`)
-              .setDescription(`Le casier n°${casierId} de **${nom}** a été supprimé.`)
-              .setColor(0xe74c3c),
-          ],
-          components: [],
-        });
+        const embedDeleted = new EmbedBuilder()
+          .setTitle(`🗑️ Casier supprimé`)
+          .setDescription(`Le casier n°${casierId} de **${nom}** a été supprimé.`)
+          .setColor(0xe74c3c);
+
+        try {
+          await interaction.update({
+            embeds: [embedDeleted],
+            components: [],
+          });
+        } catch (err) {
+          console.warn(
+            "⚠️ Impossible de modifier le message pour supprimer le casier (message supprimé ou expiré)."
+          );
+        }
+      }
+    });
+
+    collector.on("end", async () => {
+      try {
+        await menuMessage.edit({ components: [] });
+      } catch (err) {
+        console.warn("⚠️ Message introuvable à la fin du collector.");
       }
     });
   },
