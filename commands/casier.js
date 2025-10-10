@@ -1,10 +1,19 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
-const { getCasiers } = require("../jsonbin"); // Import JSONBin helper
+const fs = require("fs");
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} = require("discord.js");
 
 module.exports = {
   name: "casier",
   description: "Affiche les casiers judiciaires des membres.",
-  async execute(message) {
+  async execute(message, args, client) {
+    const dataPath = "./casiers.json";
+    if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, "{}");
+    const casiersData = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+
     const membres = [
       "Mr Diego",
       "Mr Léo F.",
@@ -26,15 +35,13 @@ module.exports = {
       "Mr Aldo",
     ];
 
-    // Récupère les casiers depuis JSONBin
-    const casiersData = await getCasiers();
-
     // Menu principal
     const rows = [];
     const boutonsParLigne = 5;
     for (let i = 0; i < membres.length; i += boutonsParLigne) {
       const row = new ActionRowBuilder();
-      membres.slice(i, i + boutonsParLigne).forEach((nom) => {
+      const chunk = membres.slice(i, i + boutonsParLigne);
+      chunk.forEach((nom) => {
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`personne_${nom}`)
@@ -47,7 +54,9 @@ module.exports = {
 
     const embedMenu = new EmbedBuilder()
       .setTitle("📁 Menu des casiers judiciaires")
-      .setDescription("Choisis une personne pour consulter ses casiers :")
+      .setDescription(
+        "Choisis une personne pour consulter ses casiers :"
+      )
       .setColor(0x5865f2);
 
     let menuMessage;
@@ -61,7 +70,9 @@ module.exports = {
       return;
     }
 
-    const collector = menuMessage.createMessageComponentCollector({ time: 300000 });
+    const collector = menuMessage.createMessageComponentCollector({
+      time: 300000,
+    });
 
     collector.on("collect", async (interaction) => {
       if (!interaction.isButton()) return;
