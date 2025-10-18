@@ -6,10 +6,6 @@ module.exports = {
   adminOnly: true,
   async execute(message, args) {
     // Vérifie les permissions
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return message.reply("❌ Tu n’as pas la permission d’utiliser cette commande.");
-    }
-
     if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
       return message.reply("❌ Je n’ai pas la permission de gérer les rôles !");
     }
