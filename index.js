@@ -65,7 +65,7 @@ client.once("ready", async () => {
 
   client.user.setPresence({
     activities: [{ name: "les révolutions 👀", type: ActivityType.Watching }],
-    status: "online",
+    status: "offline",
   });
 
   const setupLogger = require("./logger");
