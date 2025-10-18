@@ -1,90 +1,95 @@
-const fs = require("fs");
-const path = require("path");
-const {
-  EmbedBuilder,
-  PermissionsBitField,
-  Colors
-} = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 
 module.exports = {
-  name: "shield",
-  description: "Active le mode bouclier de sécurité sur le serveur.",
-  adminOnly: true,
-
-  async execute(message, args, client) {
-    const guild = message.guild;
-    if (!guild) return message.reply("❌ Cette commande ne peut être utilisée que dans un serveur.");
-
-    if (args[0] !== "confirm") {
-      const embedWarn = new EmbedBuilder()
-        .setTitle("⚠️ Confirmation requise")
-        .setDescription(
-          "**ATTENTION :** Cette commande va :\n" +
-          "• Bloquer tous les salons en écriture et en vocal\n" +
-          "• Désactiver toutes les commandes sauf `+unshield`\n\n" +
-          "👉 Tape `+shield confirm` pour confirmer."
-        )
-        .setColor(Colors.Yellow);
-      return message.reply({ embeds: [embedWarn] });
+  name: 'shield',
+  description: 'Active ou désactive les permissions pour parler avec un message de prévention.',
+  async execute(message) {
+    // Vérifie si l’utilisateur est admin
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return message.reply("❌ Tu n’as pas la permission d’utiliser cette commande.");
     }
 
-    const commandsFile = path.join(__dirname, "../commands_state.json");
-    const backupFile = path.join(__dirname, "../permissions_backup.json");
+    // Vérifie les permissions du bot
+    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+      return message.reply("❌ Je n’ai pas la permission de gérer les rôles !");
+    }
 
-    const embedStart = new EmbedBuilder()
-      .setTitle("🛡️ Activation du bouclier...")
-      .setColor(Colors.Blurple)
-      .setDescription("Sauvegarde des permissions et verrouillage en cours...");
-    await message.channel.send({ embeds: [embedStart] });
+    // Demande l’ID du salon où envoyer le message d’alerte
+    await message.reply("🛡️ Envoie maintenant **l’ID du salon** où je dois envoyer le message de prévention du shield :");
 
-    // 1️⃣ Sauvegarde les permissions actuelles
-    const backup = {};
-    for (const channel of guild.channels.cache.values()) {
-      if (channel.isThread()) continue;
-      const everyonePerms = channel.permissionOverwrites.cache.get(guild.roles.everyone.id);
-      if (everyonePerms) {
-        backup[channel.id] = {
-          allow: everyonePerms.allow.bitfield.toString(),
-          deny: everyonePerms.deny.bitfield.toString(),
-        };
+    const filter = m => m.author.id === message.author.id;
+    const collected = await message.channel.awaitMessages({ filter, max: 1, time: 30000 });
+
+    if (!collected.size) return message.reply("⏰ Temps écoulé, commande annulée.");
+
+    const channelId = collected.first().content.trim();
+    const targetChannel = message.guild.channels.cache.get(channelId);
+
+    if (!targetChannel) {
+      return message.reply("❌ ID de salon invalide. Commande annulée.");
+    }
+
+    // Crée les boutons
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('shield_on')
+        .setLabel('🟢 Activer')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('shield_off')
+        .setLabel('🔴 Désactiver')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    // Envoie les boutons
+    const sent = await message.reply({
+      content: `Choisis une action pour le **Shield** :`,
+      components: [row]
+    });
+
+    // Attend une interaction
+    const collector = sent.createMessageComponentCollector({
+      filter: i => i.user.id === message.author.id,
+      time: 30000
+    });
+
+    collector.on('collect', async interaction => {
+      const everyoneRole = message.guild.roles.everyone;
+
+      if (interaction.customId === 'shield_on') {
+        // Désactive la permission d’écrire
+        for (const channel of message.guild.channels.cache.values()) {
+          if (channel.isTextBased()) {
+            await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: false }).catch(() => {});
+          }
+        }
+
+        await targetChannel.send("🛡️ **ALERTE SHIELD ACTIVÉ !**\nLes permissions d’envoi de messages ont été temporairement bloquées pour tout le monde.");
+        await interaction.reply({ content: "✅ Shield **activé** avec succès !", ephemeral: true });
+
+      } else if (interaction.customId === 'shield_off') {
+        // Réactive la permission d’écrire
+        for (const channel of message.guild.channels.cache.values()) {
+          if (channel.isTextBased()) {
+            await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: true }).catch(() => {});
+          }
+        }
+
+        await targetChannel.send("🔓 **Shield désactivé.** Tout le monde peut à nouveau parler.");
+        await interaction.reply({ content: "✅ Shield **désactivé** avec succès !", ephemeral: true });
       }
-    }
-    fs.writeFileSync(backupFile, JSON.stringify(backup, null, 2));
 
-    // 2️⃣ Bloque les messages et les vocaux sans cacher les salons
-    let protectedCount = 0;
-    for (const channel of guild.channels.cache.values()) {
-      if (channel.isThread()) continue;
-      try {
-        await channel.permissionOverwrites.edit(guild.roles.everyone, {
-          SendMessages: false,
-          AddReactions: false,
-          Speak: false,
-          Connect: false,
-          Stream: false,
-          ViewChannel: true,
-        });
-        protectedCount++;
-      } catch (err) {
-        console.log(`❌ Erreur sur ${channel.name}: ${err.message}`);
+      // Désactive les boutons après clic
+      row.components.forEach(button => button.setDisabled(true));
+      await sent.edit({ components: [row] });
+      collector.stop();
+    });
+
+    collector.on('end', collected => {
+      if (collected.size === 0) {
+        row.components.forEach(button => button.setDisabled(true));
+        sent.edit({ content: "⏰ Temps écoulé, aucune action choisie.", components: [row] });
       }
-    }
-
-    // 3️⃣ Désactiver toutes les commandes sauf +unshield
-    let states = {};
-    if (fs.existsSync(commandsFile)) states = JSON.parse(fs.readFileSync(commandsFile, "utf8"));
-    for (const [name] of client.commands) states[name] = name === "unshield";
-    fs.writeFileSync(commandsFile, JSON.stringify(states, null, 2));
-
-    // 4️⃣ Message final
-    const embedEnd = new EmbedBuilder()
-      .setTitle("✅ Bouclier activé !")
-      .setColor(Colors.Green)
-      .setDescription(
-        `**${protectedCount} salons** ont été sécurisés.\n\n` +
-        "Toutes les commandes sont désactivées sauf `+unshield`."
-      )
-      .setFooter({ text: "Serveur en mode protection totale." });
-    await message.channel.send({ embeds: [embedEnd] });
+    });
   }
 };
