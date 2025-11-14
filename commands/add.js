@@ -2,6 +2,7 @@ module.exports = {
   name: "add",
   description: "Ajoute un membre à une plainte (salon actuel) - admin only.",
   adminOnly: true,
+  moderatorOnly: true,
   async execute(message, args) {
     if (!message.member.permissions.has("ManageChannels")) {
       return message.reply("❌ Tu n'as pas la permission de gérer ce salon !");

@@ -4,6 +4,7 @@ module.exports = {
   name: "close",
   description: "Envoie un bouton pour fermer la plainte. - admin only",
   adminOnly: true,
+  moderatorOnly: true,
   async execute(message, args) {
     if (!message.member.permissions.has("ManageChannels")) {
       return message.reply("❌ Tu n'as pas la permission de fermer ce salon !");
