@@ -1,11 +1,12 @@
 module.exports = {
   name: "noël",
-  description: "Spam spécial Noël dans le salon actuel (infini).",
+  description: "Spam spécial Noël (2000 messages max).",
+  adminOnly: true,
+  moderatorOnly: true,
   ownerOnly: true,
-  adminOnly: false,
-  moderatorOnly: false,
 
   async execute(message, args) {
+
     const spamMessage = `
 👨‍🏫
 👨‍🏫
@@ -195,7 +196,6 @@ module.exports = {
 👨‍🏫
 👨‍🏫
 👨‍🏫
-
 👨‍🏫
 👨‍🏫
 👨‍🏫
@@ -261,11 +261,14 @@ module.exports = {
 👨‍🏫
     `;
 
-    message.channel.send("🎄 **Spam Noël lancé (infini) !** 🎄");
+    let sent = 0;
+    const maxMessages = 2000;
 
-    while (true) {
+    while (sent < maxMessages) {
       await message.channel.send(spamMessage);
-      await new Promise(res => setTimeout(res, 500)); // 0.5s entre chaque spam pour éviter un crash
+      sent++;
     }
+
+    await message.channel.send("🎄 **Spam Noël terminé ! (2000 messages envoyés)**");
   }
 };
