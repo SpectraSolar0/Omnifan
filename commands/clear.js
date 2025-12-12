@@ -1,6 +1,6 @@
 module.exports = {
   name: "clear",
-  description: "Supprime un nombre de messages spécifié. - admin only",
+  description: "Supprime un nombre de messages spécifié ou max (500). - admin only",
   adminOnly: true,
   moderatorOnly: true,
   async execute(message, args) {
@@ -9,22 +9,46 @@ module.exports = {
       return message.reply("❌ Tu n'as pas la permission de gérer les messages !");
     }
 
-    // Vérifier l'argument
-    const amount = parseInt(args[0]);
-    if (!amount || isNaN(amount) || amount <= 0 || amount > 1000) {
-      return message.reply("❌ Veuillez indiquer un nombre valide entre 1 et 1000.");
+    if (!args[0]) {
+      return message.reply("❌ Utilisation : `!clear <nombre|max>`");
     }
 
-    try {
-      // Supprimer les messages
-      await message.channel.bulkDelete(amount, true);
+    let amount;
 
-      // Envoyer un message temporaire de confirmation
-      const confirmation = await message.channel.send(`✅ ${amount} messages ont été supprimés.`);
-      setTimeout(() => confirmation.delete().catch(() => {}), 5000); // supprime après 5s
+    // Gestion du "max"
+    if (args[0].toLowerCase() === "max") {
+      amount = 500;
+    } else {
+      amount = parseInt(args[0]);
+      if (isNaN(amount) || amount <= 0 || amount > 500) {
+        return message.reply("❌ Veuillez indiquer un nombre valide entre 1 et 500 ou `max`.");
+      }
+    }
+
+    let deleted = 0;
+
+    try {
+      while (deleted < amount) {
+        const toDelete = Math.min(100, amount - deleted);
+
+        const messages = await message.channel.messages.fetch({ limit: toDelete });
+        if (messages.size === 0) break;
+
+        await message.channel.bulkDelete(messages, true);
+        deleted += messages.size;
+      }
+
+      const confirmation = await message.channel.send(
+        `🧹 **${deleted} messages supprimés.**`
+      );
+
+      setTimeout(() => confirmation.delete().catch(() => {}), 5000);
+
     } catch (err) {
       console.error(err);
-      message.channel.send("❌ Impossible de supprimer les messages. Ils peuvent être trop anciens (>14 jours).");
+      message.channel.send(
+        "❌ Impossible de supprimer les messages (certains ont peut-être plus de 14 jours)."
+      );
     }
   }
 };
