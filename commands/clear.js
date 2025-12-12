@@ -11,8 +11,8 @@ module.exports = {
 
     // Vérifier l'argument
     const amount = parseInt(args[0]);
-    if (!amount || isNaN(amount) || amount <= 0 || amount > 100) {
-      return message.reply("❌ Veuillez indiquer un nombre valide entre 1 et 100.");
+    if (!amount || isNaN(amount) || amount <= 0 || amount > 1000) {
+      return message.reply("❌ Veuillez indiquer un nombre valide entre 1 et 1000.");
     }
 
     try {
