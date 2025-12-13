@@ -1,10 +1,16 @@
-const { Client, GatewayIntentBits, Partials, ActivityType } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  ActivityType,
+} = require("discord.js");
 const fs = require("fs");
+const express = require("express");
 require("dotenv").config();
 
-// ----------------------
-// INITIALISATION DU CLIENT
-// ----------------------
+// ======================
+// CLIENT
+// ======================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -18,21 +24,20 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-// ----------------------
-// SERVEUR EXPRESS (KEEP ALIVE)
-// ----------------------
-const express = require("express");
+// ======================
+// EXPRESS (KEEP ALIVE)
+// ======================
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("Bot actif !"));
+app.get("/", (_, res) => res.send("Bot actif !"));
 app.listen(port, () =>
   console.log(`🌐 Serveur web actif sur le port ${port}`)
 );
 
-// ----------------------
+// ======================
 // PREFIX & COMMANDES
-// ----------------------
+// ======================
 const prefix = "+";
 client.commands = new Map();
 const commandsFile = "./commands_state.json";
@@ -43,6 +48,7 @@ if (fs.existsSync(commandsFile)) {
 }
 
 if (!fs.existsSync("./commands")) fs.mkdirSync("./commands");
+
 const commandFiles = fs
   .readdirSync("./commands")
   .filter((file) => file.endsWith(".js"));
@@ -57,14 +63,14 @@ for (const file of commandFiles) {
   });
 }
 
-// ----------------------
+// ======================
 // IDS AUTORISÉS
-// ----------------------
+// ======================
 const ALLOWED_IDS = ["1105601228047654912", "991295146215882872"];
 
-// ----------------------
-// LOGS CONFIG (CENTRALISÉ)
-// ----------------------
+// ======================
+// LOGS CONFIG
+// ======================
 const LOGS_CONFIG = {
   default: "1416538327682777088",
 
@@ -75,31 +81,28 @@ const LOGS_CONFIG = {
   channels: "1449361307399753808",
 
   voice: "1449360380097855488",
-
   bans: "1449361373514563636",
 };
 
-// ----------------------
-// CLIENT READY
-// ----------------------
-client.once("ready", async () => {
+// ======================
+// READY
+// ======================
+client.once("ready", () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
   client.user.setPresence({
     activities: [{ name: "🪬 Shield OFF 🪬", type: ActivityType.Watching }],
-    status: "offline",
+    status: "online",
   });
 
   // Logger
-  const setupLogger = require("./logger");
-  setupLogger(client, LOGS_CONFIG);
-
-  console.log("📡 Logger chargé avec LOGS_CONFIG.");
+  require("./logger")(client, LOGS_CONFIG);
+  console.log("📡 Logger multi-salons chargé.");
 });
 
-// ----------------------
-// GESTION DES COMMANDES
-// ----------------------
+// ======================
+// COMMANDES
+// ======================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
@@ -126,16 +129,15 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// ----------------------
-// GESTION DES BOUTONS (PLAINTES)
-// ----------------------
+// ======================
+// PLAINTES (BOUTONS)
+// ======================
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
-  const guild = interaction.guild;
-  const user = interaction.user;
+  const { guild, user } = interaction;
 
-  // Créer une plainte
+  // ➕ Créer une plainte
   if (interaction.customId === "create_complaint") {
     try {
       const existing = guild.channels.cache.find(
@@ -148,7 +150,7 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
-      const complaintChannel = await guild.channels.create({
+      const channel = await guild.channels.create({
         name: `plainte-${user.id}`,
         type: 0,
         permissionOverwrites: [
@@ -157,13 +159,8 @@ client.on("interactionCreate", async (interaction) => {
         ],
       });
 
-      await complaintChannel.send(
-        `Bienvenue ${user}, ta plainte est créée.`
-      );
-      await interaction.reply({
-        content: "✅ Plainte créée.",
-        ephemeral: true,
-      });
+      await channel.send(`Bienvenue ${user}, ta plainte est créée.`);
+      interaction.reply({ content: "✅ Plainte créée.", ephemeral: true });
     } catch (err) {
       console.error(err);
       interaction.reply({
@@ -173,7 +170,7 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
-  // Fermer une plainte
+  // ❌ Fermer une plainte
   if (interaction.customId === "close_complaint") {
     try {
       await interaction.channel.delete();
@@ -183,10 +180,9 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// ----------------------
+// ======================
 // LOGIN
-// ----------------------
+// ======================
 client.login(process.env.TOKEN);
 
 module.exports = client;
-
