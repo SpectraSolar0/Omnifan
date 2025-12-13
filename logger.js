@@ -213,7 +213,7 @@ client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
     return sendLog(
       guild,
       LOGS_CONFIG,
-      "voice",
+      "bans",
       new EmbedBuilder()
         .setTitle(newS.serverMute ? "🔇 Mute vocal" : "🔊 Unmute vocal")
         .setColor(newS.serverMute ? COLORS.red : COLORS.green)
@@ -229,7 +229,7 @@ client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
     return sendLog(
       guild,
       LOGS_CONFIG,
-      "voice",
+      "bans",
       new EmbedBuilder()
         .setTitle(newS.serverDeaf ? "🔈 Casque retiré (Deafen)" : "🎧 Casque rendu (Undeafen)")
         .setColor(newS.serverDeaf ? COLORS.red : COLORS.green)
