@@ -66,7 +66,7 @@ client.once("ready", async () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
   client.user.setPresence({
-    activities: [{ name: "les révolutions 👀", type: ActivityType.Watching }],
+    activities: [{ name: "🪬 Shield OFF 🪬", type: ActivityType.Watching }],
     status: "offline",
   });
 
