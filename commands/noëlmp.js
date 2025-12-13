@@ -1,7 +1,7 @@
 module.exports = {
   name: "noëlmp",
   description: "Spam de Noël en message privé à l'utilisateur mentionné.",
-  adminOnly: false,
+  adminOnly: true,
   moderatorOnly: false,
   ownerOnly: true,
 
