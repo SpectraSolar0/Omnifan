@@ -7,6 +7,7 @@ const {
 } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
+const path = require("path");
 require("dotenv").config();
 
 /* ======================
@@ -37,16 +38,23 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (_, res) => res.send("Bot actif !"));
 
 /* ======================
-   PERMISSIONS DYNAMIQUES
+   PERMISSIONS (FICHIER)
 ====================== */
-const path = require("path");
 const permissionsFile = path.join(__dirname, "permissions.json");
 
 function loadPermissions() {
   if (!fs.existsSync(permissionsFile)) {
+    const base = { owners: [], admins: [], moderators: [] };
+    fs.writeFileSync(permissionsFile, JSON.stringify(base, null, 2));
+    return base;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(permissionsFile, "utf8"));
+  } catch (e) {
+    console.error("❌ permissions.json invalide");
     return { owners: [], admins: [], moderators: [] };
   }
-  return JSON.parse(fs.readFileSync(permissionsFile, "utf8"));
 }
 
 /* ======================
@@ -85,7 +93,7 @@ h1,h2 { margin-bottom:10px }
   <button>💾 Sauvegarder</button>
 </form>
 
-<p>Les changements sont appliqués immédiatement.</p>
+<p>✅ Appliqué instantanément</p>
 
 </body>
 </html>
@@ -93,7 +101,7 @@ h1,h2 { margin-bottom:10px }
 });
 
 app.post("/panel/save", (req, res) => {
-  const clean = (txt) =>
+  const clean = txt =>
     txt.split(",").map(x => x.trim()).filter(Boolean);
 
   const data = {
@@ -103,6 +111,8 @@ app.post("/panel/save", (req, res) => {
   };
 
   fs.writeFileSync(permissionsFile, JSON.stringify(data, null, 2));
+  console.log("📝 permissions.json mis à jour :", data);
+
   res.redirect("/panel");
 });
 
@@ -118,9 +128,7 @@ client.commands = new Map();
 
 if (!fs.existsSync("./commands")) fs.mkdirSync("./commands");
 
-const commandFiles = fs.readdirSync("./commands").filter(f => f.endsWith(".js"));
-
-for (const file of commandFiles) {
+for (const file of fs.readdirSync("./commands").filter(f => f.endsWith(".js"))) {
   const command = require(`./commands/${file}`);
   client.commands.set(command.name, command);
 }
@@ -128,6 +136,7 @@ for (const file of commandFiles) {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
+  if (!message.guild) return; // ❗ empêche les crash DM
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
@@ -158,55 +167,6 @@ client.on("messageCreate", async (message) => {
 });
 
 /* ======================
-   PLAINTES (BOUTONS)
-====================== */
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  const { guild, user } = interaction;
-
-  if (interaction.customId === "create_complaint") {
-    try {
-      const existing = guild.channels.cache.find(
-        c => c.name === `plainte-${user.id}`
-      );
-      if (existing) {
-        return interaction.reply({
-          content: "❌ Tu as déjà une plainte ouverte.",
-          ephemeral: true,
-        });
-      }
-
-      const channel = await guild.channels.create({
-        name: `plainte-${user.id}`,
-        type: 0,
-        permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] },
-          { id: user.id, allow: ["ViewChannel", "SendMessages"] },
-        ],
-      });
-
-      await channel.send(`👋 Bonjour ${user}, ta plainte est créée.`);
-      interaction.reply({ content: "✅ Plainte créée.", ephemeral: true });
-    } catch (err) {
-      console.error(err);
-      interaction.reply({
-        content: "❌ Impossible de créer la plainte.",
-        ephemeral: true,
-      });
-    }
-  }
-
-  if (interaction.customId === "close_complaint") {
-    try {
-      await interaction.channel.delete();
-    } catch (err) {
-      console.error(err);
-    }
-  }
-});
-
-/* ======================
    READY
 ====================== */
 client.once("ready", () => {
@@ -216,16 +176,9 @@ client.once("ready", () => {
     activities: [{ name: "🪬 Shield OFF 🪬", type: ActivityType.Watching }],
     status: "online",
   });
-
-  if (fs.existsSync("./logger.js")) {
-    require("./logger")(client);
-    console.log("📡 Logger chargé.");
-  }
 });
 
 /* ======================
    LOGIN
 ====================== */
 client.login(process.env.TOKEN);
-
-module.exports = client;
