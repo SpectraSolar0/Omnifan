@@ -122,7 +122,7 @@ module.exports = {
 
           client.user.setPresence({
             status: "dnd",
-            activities: [{ name: "🛡️ SHIELD ACTIF — SÉCURITÉ", type: ActivityType.Watching }]
+            activities: [{ name: "⚠️ Shield ON ⚠️", type: ActivityType.Watching }]
           });
 
           const alertChannel = guild.channels.cache.get(ALERT_CHANNEL_ID);
@@ -168,7 +168,7 @@ module.exports = {
 
           client.user.setPresence({
             status: "online",
-            activities: [{ name: "🛡️ Shield désactivé", type: ActivityType.Watching }]
+            activities: [{ name: "🪬 Shield OFF 🪬", type: ActivityType.Watching }]
           });
         }
 
