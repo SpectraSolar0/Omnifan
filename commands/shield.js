@@ -17,8 +17,9 @@ const ALERT_CHANNEL_ID = "1449194695996739696";
 module.exports = {
   name: "shield",
   description: "Panel avancé de gestion du shield",
-  adminOnly: true,
-  moderatorOnly: true,
+  adminOnly: false,
+  moderatorOnly: false,
+  ownerOnly: true,
 
   async execute(message) {
     // Salon unique
