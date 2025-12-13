@@ -10,6 +10,7 @@ module.exports = {
   name: "addcasier",
   description: "Ajoute un casier judiciaire à une personne avec un menu interactif. - admin only",
   adminOnly: true,
+  moderatorOnly: true,
   async execute(message, args, client) {
     const dataPath = "./casiers.json";
     if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, "{}");
