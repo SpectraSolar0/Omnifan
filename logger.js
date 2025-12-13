@@ -148,39 +148,96 @@ module.exports = (client, LOGS_CONFIG) => {
     sendLog(newM.guild, LOGS_CONFIG, "roles", embed);
   });
 
-  // ======================
-  // VOCAL
-  // ======================
-  client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
-    const guild = newS.guild ?? oldS.guild;
-    if (!guild) return;
+// ======================
+// VOCAL
+// ======================
+client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
+  const guild = newS.guild ?? oldS.guild;
+  if (!guild) return;
 
-    if (!oldS.channelId && newS.channelId) {
-      return sendLog(
-        guild,
-        LOGS_CONFIG,
-        "voice",
-        new EmbedBuilder()
-          .setTitle("🔊 Connexion vocale")
-          .setColor(COLORS.green)
-          .setDescription(`${newS.member.user.tag} → ${newS.channel.name}`)
-      );
-    }
+  const member = newS.member ?? oldS.member;
 
-    if (oldS.channelId && !newS.channelId) {
-      const executor = await getExecutor(guild, AuditLogEvent.MemberDisconnect);
-      return sendLog(
-        guild,
-        LOGS_CONFIG,
-        "voice",
-        new EmbedBuilder()
-          .setTitle("❌ Déconnexion vocale")
-          .setColor(COLORS.red)
-          .setDescription(oldS.member.user.tag)
-          .addFields({ name: "Par", value: executor })
-      );
-    }
-  });
+  // 🔊 Connexion vocale
+  if (!oldS.channelId && newS.channelId) {
+    return sendLog(
+      guild,
+      LOGS_CONFIG,
+      "voice",
+      new EmbedBuilder()
+        .setTitle("🔊 Connexion vocale")
+        .setColor(COLORS.green)
+        .setDescription(`${member.user.tag} → ${newS.channel.name}`)
+    );
+  }
+
+  // 🔀 Déplacement vocal
+  if (oldS.channelId && newS.channelId && oldS.channelId !== newS.channelId) {
+    const executor = await getExecutor(guild, AuditLogEvent.MemberMove);
+
+    return sendLog(
+      guild,
+      LOGS_CONFIG,
+      "voice",
+      new EmbedBuilder()
+        .setTitle("🔀 Déplacement vocal")
+        .setColor(COLORS.orange)
+        .setDescription(`Utilisateur : **${member.user.tag}**`)
+        .addFields(
+          { name: "De", value: oldS.channel.name, inline: true },
+          { name: "Vers", value: newS.channel.name, inline: true },
+          { name: "Par", value: executor }
+        )
+    );
+  }
+
+  // ❌ Déconnexion vocale
+  if (oldS.channelId && !newS.channelId) {
+    const executor = await getExecutor(guild, AuditLogEvent.MemberDisconnect);
+
+    return sendLog(
+      guild,
+      LOGS_CONFIG,
+      "voice",
+      new EmbedBuilder()
+        .setTitle("❌ Déconnexion vocale")
+        .setColor(COLORS.red)
+        .setDescription(member.user.tag)
+        .addFields({ name: "Par", value: executor })
+    );
+  }
+
+  // 🔇 Mute / Unmute serveur
+  if (oldS.serverMute !== newS.serverMute) {
+    const executor = await getExecutor(guild, AuditLogEvent.MemberUpdate);
+
+    return sendLog(
+      guild,
+      LOGS_CONFIG,
+      "voice",
+      new EmbedBuilder()
+        .setTitle(newS.serverMute ? "🔇 Mute vocal" : "🔊 Unmute vocal")
+        .setColor(newS.serverMute ? COLORS.red : COLORS.green)
+        .setDescription(`Utilisateur : **${member.user.tag}**`)
+        .addFields({ name: "Par", value: executor })
+    );
+  }
+
+  // 🔈 Deafen / Undeafen serveur
+  if (oldS.serverDeaf !== newS.serverDeaf) {
+    const executor = await getExecutor(guild, AuditLogEvent.MemberUpdate);
+
+    return sendLog(
+      guild,
+      LOGS_CONFIG,
+      "voice",
+      new EmbedBuilder()
+        .setTitle(newS.serverDeaf ? "🔈 Casque retiré (Deafen)" : "🎧 Casque rendu (Undeafen)")
+        .setColor(newS.serverDeaf ? COLORS.red : COLORS.green)
+        .setDescription(`Utilisateur : **${member.user.tag}**`)
+        .addFields({ name: "Par", value: executor })
+    );
+  }
+});
 
   // ======================
   // SALONS
