@@ -1,328 +1,272 @@
-const { Events, AuditLogEvent, EmbedBuilder, PermissionsBitField } = require("discord.js");
+const { Events, AuditLogEvent, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
-const CONFIG = path.join(__dirname, "logs_config.json");
+// ======================
+// CONFIG
+// ======================
+const CONFIG_PATH = path.join(__dirname, "logs_config.json");
+const FOOTER = { text: "Logger • discord.js" };
 
-// Récupère le salon de logs
-async function getLogChannel(guild) {
-  if (!fs.existsSync(CONFIG)) return null;
+const COLORS = {
+  red: 0xE74C3C,
+  green: 0x2ECC71,
+  orange: 0xE67E22,
+  yellow: 0xF1C40F,
+  blue: 0x3498DB,
+  darkBlue: 0x2980B9,
+  purple: 0x8E44AD,
+};
+
+// ======================
+// HELPERS
+// ======================
+function readConfig() {
+  if (!fs.existsSync(CONFIG_PATH)) return null;
   try {
-    const cfg = JSON.parse(fs.readFileSync(CONFIG, "utf8"));
-    const ch = await guild.channels.fetch(cfg.logChannel).catch(() => null);
-    return ch && ch.isTextBased() ? ch : null;
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
   } catch {
     return null;
   }
 }
 
-function safe(text, max = 1024) {
-  if (!text) return "(vide)";
-  return text.length > max ? text.slice(0, max - 3) + "..." : text;
+async function getLogChannel(guild) {
+  const cfg = readConfig();
+  if (!cfg?.logChannel) return null;
+
+  const channel = await guild.channels.fetch(cfg.logChannel).catch(() => null);
+  return channel?.isTextBased() ? channel : null;
 }
 
+function safe(text, max = 1024) {
+  if (!text) return "(vide)";
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+async function sendLog(guild, embed) {
+  const channel = await getLogChannel(guild);
+  if (!channel) return;
+
+  embed.setTimestamp().setFooter(FOOTER);
+  channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+async function getExecutor(guild, type) {
+  try {
+    const logs = await guild.fetchAuditLogs({ type, limit: 1 });
+    const entry = logs.entries.first();
+    if (entry && Date.now() - entry.createdTimestamp < 5000) {
+      return entry.executor?.tag ?? "Inconnu";
+    }
+  } catch {}
+  return "Inconnu";
+}
+
+// ======================
+// LOGGER
+// ======================
 module.exports = (client) => {
   console.log("📡 Logger complet chargé.");
 
-  // -----------------------
-  // MESSAGES SUPPRIMÉS
-  // -----------------------
+  // --------------------
+  // MESSAGE SUPPRIMÉ
+  // --------------------
   client.on(Events.MessageDelete, async (message) => {
     if (!message.guild) return;
-    const logChannel = await getLogChannel(message.guild);
-    if (!logChannel) return;
-
     if (message.partial) {
-      try { message = await message.fetch(); } catch {}
+      try { message = await message.fetch(); } catch { return; }
     }
-
-    const author = message.author ? message.author.tag : "Inconnu";
-    const content = message.content || (message.attachments.size ? "[Pièce jointe]" : "(non disponible)");
-    const channelRef = `#${message.channel?.name ?? "inconnu"}`;
 
     const embed = new EmbedBuilder()
       .setTitle("🗑️ Message supprimé")
-      .setColor(0xE74C3C)
+      .setColor(COLORS.red)
       .addFields(
-        { name: "Auteur", value: safe(author), inline: true },
-        { name: "Salon", value: safe(channelRef), inline: true },
-        { name: "Contenu", value: safe(content) }
+        { name: "Auteur", value: safe(message.author?.tag), inline: true },
+        { name: "Salon", value: message.channel ? `<#${message.channel.id}>` : "Inconnu", inline: true },
+        { name: "Contenu", value: safe(message.content || (message.attachments.size ? "[Pièce jointe]" : "(non disponible)")) }
       )
-      .setTimestamp();
+      .setThumbnail(message.author?.displayAvatarURL());
 
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    sendLog(message.guild, embed);
   });
 
-  // -----------------------
-  // MESSAGES MODIFIÉS
-  // -----------------------
-  client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    const guild = newMessage.guild ?? oldMessage.guild;
+  // --------------------
+  // MESSAGE MODIFIÉ
+  // --------------------
+  client.on(Events.MessageUpdate, async (oldMsg, newMsg) => {
+    const guild = newMsg.guild ?? oldMsg.guild;
     if (!guild) return;
-    const logChannel = await getLogChannel(guild);
-    if (!logChannel) return;
 
-    const oldContent = oldMessage?.content ?? "(non disponible)";
-    const newContent = newMessage.content ?? "(vide)";
-    if (oldContent === newContent) return;
-
-    const author = newMessage.author ? newMessage.author.tag : "Inconnu";
-    const channelRef = `#${newMessage.channel?.name ?? "inconnu"}`;
+    const before = oldMsg?.content ?? "(non disponible)";
+    const after = newMsg?.content ?? "(vide)";
+    if (before === after) return;
 
     const embed = new EmbedBuilder()
       .setTitle("✏️ Message modifié")
-      .setColor(0xF1C40F)
+      .setColor(COLORS.yellow)
       .addFields(
-        { name: "Auteur", value: safe(author), inline: true },
-        { name: "Salon", value: safe(channelRef), inline: true },
-        { name: "Avant", value: safe(oldContent) },
-        { name: "Après", value: safe(newContent) }
+        { name: "Auteur", value: safe(newMsg.author?.tag), inline: true },
+        { name: "Salon", value: newMsg.channel ? `<#${newMsg.channel.id}>` : "Inconnu", inline: true },
+        { name: "Avant", value: safe(before) },
+        { name: "Après", value: safe(after) }
       )
-      .setTimestamp();
+      .setThumbnail(newMsg.author?.displayAvatarURL());
 
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    sendLog(guild, embed);
   });
 
-  // -----------------------
-  // MEMBRE REJOINT
-  // -----------------------
-  client.on(Events.GuildMemberAdd, async (member) => {
-    const logChannel = await getLogChannel(member.guild);
-    if (!logChannel) return;
-
-    const embed = new EmbedBuilder()
+  // --------------------
+  // MEMBRE REJOINT / QUITTE
+  // --------------------
+  client.on(Events.GuildMemberAdd, (member) => {
+    sendLog(member.guild, new EmbedBuilder()
       .setTitle("👋 Nouveau membre")
-      .setColor(0x2ECC71)
+      .setColor(COLORS.green)
       .setDescription(`${member.user.tag} a rejoint le serveur.`)
       .setThumbnail(member.user.displayAvatarURL())
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    );
   });
 
-  // -----------------------
-  // MEMBRE QUITTE
-  // -----------------------
-  client.on(Events.GuildMemberRemove, async (member) => {
-    const logChannel = await getLogChannel(member.guild);
-    if (!logChannel) return;
-
-    const embed = new EmbedBuilder()
+  client.on(Events.GuildMemberRemove, (member) => {
+    sendLog(member.guild, new EmbedBuilder()
       .setTitle("🚪 Membre parti")
-      .setColor(0xE67E22)
+      .setColor(COLORS.orange)
       .setDescription(`${member.user.tag} a quitté le serveur.`)
       .setThumbnail(member.user.displayAvatarURL())
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    );
   });
 
-  // -----------------------
-  // AJOUT / RETRAIT DE RÔLES SUR UN MEMBRE
-  // -----------------------
-  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    const logChannel = await getLogChannel(newMember.guild);
-    if (!logChannel) return;
+  // --------------------
+  // RÔLES MEMBRE
+  // --------------------
+  client.on(Events.GuildMemberUpdate, (oldM, newM) => {
+    const oldRoles = oldM.roles.cache.filter(r => r.id !== newM.guild.id);
+    const newRoles = newM.roles.cache.filter(r => r.id !== newM.guild.id);
 
-    const oldRoles = oldMember.roles.cache.map(r => r.name);
-    const newRoles = newMember.roles.cache.map(r => r.name);
-
-    const added = newRoles.filter(r => !oldRoles.includes(r));
-    const removed = oldRoles.filter(r => !newRoles.includes(r));
-
-    if (!added.length && !removed.length) return;
+    const added = newRoles.filter(r => !oldRoles.has(r.id));
+    const removed = oldRoles.filter(r => !newRoles.has(r.id));
+    if (!added.size && !removed.size) return;
 
     const embed = new EmbedBuilder()
-      .setTitle("🎭 Rôles modifiés sur un membre")
-      .setColor(0x3498DB)
-      .setDescription(`Utilisateur : ${newMember.user.tag}`)
-      .setTimestamp();
+      .setTitle("🎭 Rôles modifiés")
+      .setColor(COLORS.blue)
+      .setDescription(`Utilisateur : **${newM.user.tag}**`)
+      .setThumbnail(newM.user.displayAvatarURL());
 
-    if (added.length) embed.addFields({ name: "Ajoutés", value: safe(added.join(", ")) });
-    if (removed.length) embed.addFields({ name: "Retirés", value: safe(removed.join(", ")) });
+    if (added.size) embed.addFields({ name: "Ajoutés", value: safe(added.map(r => r.name).join(", ")) });
+    if (removed.size) embed.addFields({ name: "Retirés", value: safe(removed.map(r => r.name).join(", ")) });
 
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    sendLog(newM.guild, embed);
   });
 
-  // -----------------------
-  // VOIX
-  // -----------------------
-  client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-    const guild = newState.guild || oldState.guild;
+  // --------------------
+  // VOICE (JOIN / LEAVE / MOVE)
+  // --------------------
+  client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
+    const guild = newS.guild ?? oldS.guild;
     if (!guild) return;
-    const logChannel = await getLogChannel(guild);
-    if (!logChannel) return;
 
-    // Déconnexion vocale
-    if (oldState.channelId && !newState.channelId) {
-      let executor = "Inconnu";
-      try {
-        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberDisconnect, limit: 1 });
-        const entry = logs.entries.first();
-        if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-      } catch {}
+    // 🔊 JOIN
+    if (!oldS.channelId && newS.channelId) {
+      return sendLog(guild, new EmbedBuilder()
+        .setTitle("🔊 Connexion vocale")
+        .setColor(COLORS.green)
+        .addFields(
+          { name: "Utilisateur", value: newS.member?.user.tag ?? "Inconnu", inline: true },
+          { name: "Salon", value: newS.channel?.name ?? "Inconnu", inline: true }
+        )
+        .setThumbnail(newS.member?.user.displayAvatarURL())
+      );
+    }
 
-      const embed = new EmbedBuilder()
+    // ❌ LEAVE
+    if (oldS.channelId && !newS.channelId) {
+      const executor = await getExecutor(guild, AuditLogEvent.MemberDisconnect);
+
+      return sendLog(guild, new EmbedBuilder()
         .setTitle("❌ Déconnexion vocale")
-        .setColor(0xE74C3C)
+        .setColor(COLORS.red)
         .addFields(
-          { name: "Utilisateur", value: oldState.member?.user?.tag ?? "Inconnu", inline: true },
-          { name: "Salon", value: oldState.channel?.name ?? "Inconnu", inline: true },
+          { name: "Utilisateur", value: oldS.member?.user.tag ?? "Inconnu", inline: true },
+          { name: "Salon", value: oldS.channel?.name ?? "Inconnu", inline: true },
           { name: "Par", value: executor, inline: true }
         )
-        .setTimestamp();
-
-      return logChannel.send({ embeds: [embed] }).catch(() => {});
+        .setThumbnail(oldS.member?.user.displayAvatarURL())
+      );
     }
 
-    // Déplacement vocal
-    if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-      let executor = "Inconnu";
-      try {
-        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberMove, limit: 1 });
-        const entry = logs.entries.first();
-        if (entry && Date.now() - entry.createdTimestamp < 5000) executor = entry.executor?.tag ?? "Inconnu";
-      } catch {}
+    // 🔄 MOVE
+    if (oldS.channelId && newS.channelId && oldS.channelId !== newS.channelId) {
+      const executor = await getExecutor(guild, AuditLogEvent.MemberMove);
 
-      const embed = new EmbedBuilder()
+      return sendLog(guild, new EmbedBuilder()
         .setTitle("🔄 Déplacement vocal")
-        .setColor(0x2980B9)
+        .setColor(COLORS.darkBlue)
         .addFields(
-          { name: "Utilisateur", value: oldState.member?.user?.tag ?? "Inconnu", inline: true },
-          { name: "De", value: oldState.channel?.name ?? "Inconnu", inline: true },
-          { name: "Vers", value: newState.channel?.name ?? "Inconnu", inline: true },
+          { name: "Utilisateur", value: oldS.member?.user.tag ?? "Inconnu", inline: true },
+          { name: "De", value: oldS.channel?.name ?? "Inconnu", inline: true },
+          { name: "Vers", value: newS.channel?.name ?? "Inconnu", inline: true },
           { name: "Par", value: executor, inline: true }
         )
-        .setTimestamp();
-
-      return logChannel.send({ embeds: [embed] }).catch(() => {});
+        .setThumbnail(newS.member?.user.displayAvatarURL())
+      );
     }
   });
 
-  // -----------------------
-  // CRÉATION / SUPPRESSION / MODIFICATION DE RÔLES
-  // -----------------------
-  client.on(Events.GuildRoleCreate, async (role) => {
-    const logChannel = await getLogChannel(role.guild);
-    if (!logChannel) return;
+  // --------------------
+  // RÔLES
+  // --------------------
+  client.on(Events.GuildRoleCreate, (role) => sendLog(role.guild,
+    new EmbedBuilder().setTitle("➕ Rôle créé").setColor(COLORS.green).addFields({ name: "Nom", value: role.name })
+  ));
 
-    const embed = new EmbedBuilder()
-      .setTitle("➕ Rôle créé")
-      .setColor(0x2ECC71)
-      .addFields({ name: "Nom", value: role.name, inline: true })
-      .setTimestamp();
+  client.on(Events.GuildRoleDelete, (role) => sendLog(role.guild,
+    new EmbedBuilder().setTitle("🗑️ Rôle supprimé").setColor(COLORS.red).addFields({ name: "Nom", value: role.name })
+  ));
 
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  client.on(Events.GuildRoleDelete, async (role) => {
-    const logChannel = await getLogChannel(role.guild);
-    if (!logChannel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("🗑️ Rôle supprimé")
-      .setColor(0xE74C3C)
-      .addFields({ name: "Nom", value: role.name, inline: true })
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  client.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {
-    const logChannel = await getLogChannel(newRole.guild);
-    if (!logChannel) return;
-
-    const fields = [];
-
-    if (oldRole.name !== newRole.name) {
-      fields.push({ name: "Nom avant", value: safe(oldRole.name), inline: true });
-      fields.push({ name: "Nom après", value: safe(newRole.name), inline: true });
-    }
-
-    if (!fields.length) return;
-
-    const embed = new EmbedBuilder()
+  client.on(Events.GuildRoleUpdate, (oldR, newR) => {
+    if (oldR.name === newR.name) return;
+    sendLog(newR.guild, new EmbedBuilder()
       .setTitle("⚙️ Rôle modifié")
-      .setColor(0xF39C12)
-      .addFields(fields)
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  // -----------------------
-  // CRÉATION / SUPPRESSION / MODIFICATION DE SALONS
-  // -----------------------
-  client.on(Events.ChannelCreate, async (channel) => {
-    const logChannel = await getLogChannel(channel.guild);
-    if (!logChannel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("📂 Salon créé")
-      .setColor(0x2ECC71)
-      .addFields({ name: "Nom", value: channel.name, inline: true })
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  client.on(Events.ChannelDelete, async (channel) => {
-    const logChannel = await getLogChannel(channel.guild);
-    if (!logChannel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("🗑️ Salon supprimé")
-      .setColor(0xE74C3C)
-      .addFields({ name: "Nom", value: channel.name, inline: true })
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
-
-  client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
-    const logChannel = await getLogChannel(newChannel.guild);
-    if (!logChannel) return;
-
-    if (oldChannel.name === newChannel.name) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("⚙️ Salon modifié")
-      .setColor(0xF39C12)
+      .setColor(COLORS.orange)
       .addFields(
-        { name: "Nom avant", value: safe(oldChannel.name), inline: true },
-        { name: "Nom après", value: safe(newChannel.name), inline: true }
+        { name: "Avant", value: safe(oldR.name), inline: true },
+        { name: "Après", value: safe(newR.name), inline: true }
       )
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+    );
   });
 
-  // -----------------------
-  // BANS ET UNBANS
-  // -----------------------
-  client.on(Events.GuildBanAdd, async (ban) => {
-    const logChannel = await getLogChannel(ban.guild);
-    if (!logChannel) return;
+  // --------------------
+  // SALONS
+  // --------------------
+  client.on(Events.ChannelCreate, (channel) => sendLog(channel.guild,
+    new EmbedBuilder().setTitle("📂 Salon créé").setColor(COLORS.green).addFields({ name: "Nom", value: channel.name })
+  ));
 
-    const embed = new EmbedBuilder()
-      .setTitle("🔨 Utilisateur banni")
-      .setColor(0x8E44AD)
-      .addFields({ name: "Utilisateur", value: ban.user.tag, inline: true })
-      .setTimestamp();
+  client.on(Events.ChannelDelete, (channel) => sendLog(channel.guild,
+    new EmbedBuilder().setTitle("🗑️ Salon supprimé").setColor(COLORS.red).addFields({ name: "Nom", value: channel.name })
+  ));
 
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+  client.on(Events.ChannelUpdate, (oldC, newC) => {
+    if (oldC.name === newC.name) return;
+    sendLog(newC.guild, new EmbedBuilder()
+      .setTitle("⚙️ Salon modifié")
+      .setColor(COLORS.orange)
+      .addFields(
+        { name: "Avant", value: safe(oldC.name), inline: true },
+        { name: "Après", value: safe(newC.name), inline: true }
+      )
+    );
   });
 
-  client.on(Events.GuildBanRemove, async (ban) => {
-    const logChannel = await getLogChannel(ban.guild);
-    if (!logChannel) return;
+  // --------------------
+  // BANS
+  // --------------------
+  client.on(Events.GuildBanAdd, (ban) => sendLog(ban.guild,
+    new EmbedBuilder().setTitle("🔨 Utilisateur banni").setColor(COLORS.purple).addFields({ name: "Utilisateur", value: ban.user.tag })
+  ));
 
-    const embed = new EmbedBuilder()
-      .setTitle("✅ Utilisateur débanni")
-      .setColor(0x27AE60)
-      .addFields({ name: "Utilisateur", value: ban.user.tag, inline: true })
-      .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(() => {});
-  });
+  client.on(Events.GuildBanRemove, (ban) => sendLog(ban.guild,
+    new EmbedBuilder().setTitle("✅ Utilisateur débanni").setColor(COLORS.green).addFields({ name: "Utilisateur", value: ban.user.tag })
+  ));
 };
