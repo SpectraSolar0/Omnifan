@@ -9,28 +9,31 @@ const {
 let shieldStatus = false;
 let panelExists = false;
 
-const ALLOWED_CHANNEL_ID = "1449195004449914941"; // ⬅️ METS L’ID ICI
+const ALLOWED_CHANNEL_ID = "1449195004449914941";
+const ROLE_NORMAL = "1416853527002873858";
+const ROLE_SHIELD = "1449189420904480959";
+const ALERT_CHANNEL_ID = "1449194695996739696";
 
 module.exports = {
   name: "shield",
-  description: "Panel de contrôle du shield",
+  description: "Panel avancé de gestion du shield",
   adminOnly: true,
   moderatorOnly: true,
 
-  async execute(message, args) {
-    // ❌ Mauvais salon
+  async execute(message) {
+    // Salon unique
     if (message.channel.id !== ALLOWED_CHANNEL_ID) {
-      return message.reply("❌ Cette commande ne peut être utilisée que dans le salon autorisé.");
+      return message.reply("❌ Cette commande est limitée au salon du panel.");
     }
 
-    // Vérification des permissions
+    // Permissions
     if (!message.member.permissions.has("Administrator")) {
-      return message.reply("❌ Tu n'as pas la permission d'utiliser cette commande.");
+      return message.reply("❌ Permission refusée.");
     }
 
-    // ❌ Panel déjà existant
+    // Panel unique
     if (panelExists) {
-      return message.reply("⚠️ Un panel shield est déjà actif.");
+      return message.reply("⚠️ Le panel shield est déjà actif.");
     }
 
     panelExists = true;
@@ -38,128 +41,141 @@ module.exports = {
     const guild = message.guild;
     const client = message.client;
 
-    const ROLE_NORMAL = "1416853527002873858";
-    const ROLE_SHIELD = "1449189420904480959";
-    const ALERT_CHANNEL_ID = "1449194695996739696";
+    /* ================= PANEL ================= */
 
-    const getEmbed = () =>
+    const panelEmbed = () =>
       new EmbedBuilder()
-        .setTitle("🛡️ SYSTÈME DE SHIELD — PANNEAU DE CONTRÔLE")
-        .setColor(shieldStatus ? 0x2ecc71 : 0xe74c3c)
+        .setTitle("🛡️ SYSTÈME DE SHIELD — PANNEAU PRINCIPAL")
+        .setColor(shieldStatus ? 0x00ff99 : 0xff3333)
         .setDescription(
-          `### 📊 Statut du Shield\n` +
-          `${shieldStatus ? "🟢 **ACTIVÉ**" : "🔴 **DÉSACTIVÉ**"}\n\n` +
-          `### ℹ️ Informations\n` +
-          `• Panel sécurisé (salon unique)\n` +
-          `• Statut du bot synchronisé\n` +
-          `• Application globale des rôles\n\n` +
-          `### 🎛️ Contrôles\n` +
-          `Utilise les boutons ci-dessous pour gérer le shield.`
+          `## 📊 ÉTAT ACTUEL DU SHIELD\n` +
+          `${shieldStatus ? "🟢 **ACTIVÉ — NIVEAU CRITIQUE**" : "🔴 **DÉSACTIVÉ — SERVEUR OUVERT**"}\n\n` +
+
+          `## 🧠 FONCTIONNEMENT\n` +
+          `Le shield est un **système de protection globale** permettant de sécuriser\n` +
+          `l'intégralité du serveur en cas de menace, raid ou incident majeur.\n\n` +
+
+          `## 🔐 ACTIONS APPLIQUÉES\n` +
+          `• Attribution automatique des rôles\n` +
+          `• Restriction globale des accès\n` +
+          `• Surveillance renforcée\n` +
+          `• Synchronisation du statut du bot\n\n` +
+
+          `## ⚠️ CONSIGNES IMPORTANTES\n` +
+          `Toute utilisation abusive de ce système est strictement interdite.\n` +
+          `Les actions sont visibles et traçables.\n\n` +
+
+          `## 🎛️ CONTRÔLES\n` +
+          `Utilise les boutons ci-dessous pour gérer l’état du shield.`
         )
-        .setFooter({ text: "Système de sécurité du serveur" })
+        .setFooter({ text: "Système de sécurité — Accès restreint" })
         .setTimestamp();
 
-    const getButtons = () =>
+    const panelButtons = () =>
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("shield_on")
-          .setLabel("Activer le Shield")
+          .setLabel("🟢 ACTIVER LE SHIELD")
           .setStyle(ButtonStyle.Success)
           .setDisabled(shieldStatus),
 
         new ButtonBuilder()
           .setCustomId("shield_off")
-          .setLabel("Désactiver le Shield")
+          .setLabel("🔴 DÉSACTIVER LE SHIELD")
           .setStyle(ButtonStyle.Danger)
           .setDisabled(!shieldStatus)
       );
 
     const panelMessage = await message.channel.send({
-      embeds: [getEmbed()],
-      components: [getButtons()]
+      embeds: [panelEmbed()],
+      components: [panelButtons()]
     });
+
+    /* ================= INTERACTIONS ================= */
 
     const collector = panelMessage.createMessageComponentCollector();
 
     collector.on("collect", async interaction => {
-      if (interaction.channel.id !== ALLOWED_CHANNEL_ID) {
-        return interaction.reply({
-          content: "❌ Interaction non autorisée dans ce salon.",
-          ephemeral: true
-        });
-      }
-
       if (!interaction.member.permissions.has("Administrator")) {
         return interaction.reply({
-          content: "❌ Permission refusée.",
+          content: "❌ Accès refusé.",
           ephemeral: true
         });
       }
 
+      // ACK immédiat
       await interaction.deferUpdate();
-      const members = await guild.members.fetch();
 
-      // 🟢 ACTIVER
-      if (interaction.customId === "shield_on") {
-        shieldStatus = true;
+      setImmediate(async () => {
+        const members = await guild.members.fetch();
 
-        for (const member of members.values()) {
-          try {
-            if (member.roles.cache.has(ROLE_NORMAL)) {
-              await member.roles.remove(ROLE_NORMAL);
-            }
-            if (!member.roles.cache.has(ROLE_SHIELD)) {
-              await member.roles.add(ROLE_SHIELD);
-            }
-          } catch {}
+        /* ===== ACTIVER ===== */
+        if (interaction.customId === "shield_on") {
+          shieldStatus = true;
+
+          for (const member of members.values()) {
+            try {
+              await member.roles.remove(ROLE_NORMAL).catch(() => {});
+              await member.roles.add(ROLE_SHIELD).catch(() => {});
+            } catch {}
+          }
+
+          client.user.setPresence({
+            status: "dnd",
+            activities: [{ name: "🛡️ SHIELD ACTIF — SÉCURITÉ", type: ActivityType.Watching }]
+          });
+
+          const alertChannel = guild.channels.cache.get(ALERT_CHANNEL_ID);
+          if (alertChannel) {
+            const alertEmbed = new EmbedBuilder()
+              .setTitle("🚨 ALERTE MAJEURE — SERVEUR EN ÉTAT CRITIQUE")
+              .setColor(0xff0000)
+              .setDescription(
+                `⚠️ **INCIDENT DE SÉCURITÉ MAJEUR** ⚠️\n\n` +
+                `Le serveur est actuellement confronté à une situation **extrêmement critique**.\n\n` +
+
+                `🛡️ Le **shield de sécurité global** a été **ACTIVÉ** afin de protéger\n` +
+                `l’ensemble des membres et des infrastructures du serveur.\n\n` +
+
+                `🔒 L'accès au serveur est **fortement restreint**.\n` +
+                `Seuls les salons essentiels restent accessibles.\n\n` +
+
+                `👮‍♂️ **L’équipe de modération et d’administration est pleinement mobilisée**\n` +
+                `et travaille activement pour résoudre la situation.\n\n` +
+
+                `📢 Merci de **respecter strictement les consignes**, de rester calme\n` +
+                `et d’attendre les annonces officielles.\n\n` +
+
+                `Toute tentative de contournement entraînera des sanctions immédiates.`
+              )
+              .setFooter({ text: "Message officiel du staff" })
+              .setTimestamp();
+
+            await alertChannel.send({ embeds: [alertEmbed] });
+          }
         }
 
-        client.user.setPresence({
-          status: "dnd",
-          activities: [{ name: "🛡️ Shield ACTIVÉ", type: ActivityType.Watching }]
+        /* ===== DÉSACTIVER ===== */
+        if (interaction.customId === "shield_off") {
+          shieldStatus = false;
+
+          for (const member of members.values()) {
+            try {
+              await member.roles.remove(ROLE_SHIELD).catch(() => {});
+              await member.roles.add(ROLE_NORMAL).catch(() => {});
+            } catch {}
+          }
+
+          client.user.setPresence({
+            status: "online",
+            activities: [{ name: "🛡️ Shield désactivé", type: ActivityType.Watching }]
+          });
+        }
+
+        await panelMessage.edit({
+          embeds: [panelEmbed()],
+          components: [panelButtons()]
         });
-
-        const alertChannel = guild.channels.cache.get(ALERT_CHANNEL_ID);
-        if (alertChannel) {
-          const alertEmbed = new EmbedBuilder()
-            .setTitle("🚨 ALERTE SÉCURITÉ — ÉTAT CRITIQUE")
-            .setColor(0xe74c3c)
-            .setDescription(
-              "Le serveur est actuellement dans un **état critique**.\n\n" +
-              "🛡️ Le **shield de sécurité** est activé.\n\n" +
-              "👮‍♂️ Le staff est mobilisé et travaille activement.\n\n" +
-              "Merci de rester calme."
-            )
-            .setTimestamp();
-
-          await alertChannel.send({ embeds: [alertEmbed] });
-        }
-      }
-
-      // 🔴 DÉSACTIVER
-      if (interaction.customId === "shield_off") {
-        shieldStatus = false;
-
-        for (const member of members.values()) {
-          try {
-            if (member.roles.cache.has(ROLE_SHIELD)) {
-              await member.roles.remove(ROLE_SHIELD);
-            }
-            if (!member.roles.cache.has(ROLE_NORMAL)) {
-              await member.roles.add(ROLE_NORMAL);
-            }
-          } catch {}
-        }
-
-        client.user.setPresence({
-          status: "online",
-          activities: [{ name: "🛡️ Shield DÉSACTIVÉ", type: ActivityType.Watching }]
-        });
-      }
-
-      await panelMessage.edit({
-        embeds: [getEmbed()],
-        components: [getButtons()]
       });
     });
 
