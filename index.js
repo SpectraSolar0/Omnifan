@@ -1,18 +1,19 @@
+Voici mon index.js commet je fait
+
+
 const {
   Client,
   GatewayIntentBits,
   Partials,
   ActivityType,
-  PermissionsBitField
 } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
-const path = require("path");
 require("dotenv").config();
 
-/* ======================
-   DISCORD CLIENT
-====================== */
+// ======================
+// CLIENT
+// ======================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -26,149 +27,75 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-/* ======================
-   EXPRESS
-====================== */
+// ======================
+// EXPRESS (KEEP ALIVE)
+// ======================
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 app.get("/", (_, res) => res.send("Bot actif !"));
-
-/* ======================
-   PERMISSIONS (FICHIER)
-====================== */
-const permissionsFile = path.join(__dirname, "permissions.json");
-
-function loadPermissions() {
-  if (!fs.existsSync(permissionsFile)) {
-    const base = { owners: [], admins: [], moderators: [] };
-    fs.writeFileSync(permissionsFile, JSON.stringify(base, null, 2));
-    return base;
-  }
-
-  try {
-    return JSON.parse(fs.readFileSync(permissionsFile, "utf8"));
-  } catch (e) {
-    console.error("❌ permissions.json invalide");
-    return { owners: [], admins: [], moderators: [] };
-  }
-}
-
-/* ======================
-   PANEL WEB
-====================== */
-app.get("/panel", (req, res) => {
-  const perms = loadPermissions();
-
-  res.send(`
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<title>Panel du bot</title>
-<style>
-body { background:#0f172a;color:white;font-family:Arial;padding:30px }
-textarea { width:100%;height:70px }
-button { padding:12px 20px;margin-top:15px;font-size:16px }
-h1,h2 { margin-bottom:10px }
-</style>
-</head>
-<body>
-
-<h1>🤖 Panel de configuration du bot</h1>
-
-<form method="POST" action="/panel/save">
-  <h2>👑 Owners (IDs utilisateurs)</h2>
-  <textarea name="owners">${perms.owners.join(",")}</textarea>
-
-  <h2>🛡️ Admins (IDs rôles)</h2>
-  <textarea name="admins">${perms.admins.join(",")}</textarea>
-
-  <h2>👮 Modérateurs (IDs rôles)</h2>
-  <textarea name="moderators">${perms.moderators.join(",")}</textarea>
-
-  <button>💾 Sauvegarder</button>
-</form>
-
-<p>✅ Appliqué instantanément</p>
-
-</body>
-</html>
-`);
-});
-
-app.post("/panel/save", (req, res) => {
-  const clean = txt =>
-    txt.split(",").map(x => x.trim()).filter(Boolean);
-
-  const data = {
-    owners: clean(req.body.owners || ""),
-    admins: clean(req.body.admins || ""),
-    moderators: clean(req.body.moderators || "")
-  };
-
-  fs.writeFileSync(permissionsFile, JSON.stringify(data, null, 2));
-  console.log("📝 permissions.json mis à jour :", data);
-
-  res.redirect("/panel");
-});
-
 app.listen(port, () =>
   console.log(`🌐 Serveur web actif sur le port ${port}`)
 );
 
-/* ======================
-   COMMANDES
-====================== */
+// ======================
+// PREFIX & COMMANDES
+// ======================
 const prefix = "+";
 client.commands = new Map();
+const commandsFile = "./commands_state.json";
+
+let commandStates = {};
+if (fs.existsSync(commandsFile)) {
+  commandStates = JSON.parse(fs.readFileSync(commandsFile, "utf8"));
+}
 
 if (!fs.existsSync("./commands")) fs.mkdirSync("./commands");
 
-for (const file of fs.readdirSync("./commands").filter(f => f.endsWith(".js"))) {
+const commandFiles = fs
+  .readdirSync("./commands")
+  .filter((file) => file.endsWith(".js"));
+
+for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
-  client.commands.set(command.name, command);
+  const enabled = commandStates[command.name] ?? true;
+
+  client.commands.set(command.name, {
+    command: { adminOnly: false, ...command },
+    enabled,
+  });
 }
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.content.startsWith(prefix)) return;
-  if (!message.guild) return; // ❗ empêche les crash DM
+// ======================
+// AUTORISATIONS
+// ======================
 
-  const args = message.content.slice(prefix.length).trim().split(/ +/);
-  const commandName = args.shift().toLowerCase();
-  const command = client.commands.get(commandName);
-  if (!command) return;
+// Owners du bot
+const OWNERS = ["991295146215882872"];
 
-  const perms = loadPermissions();
+// Rôles serveur
+const ADMIN_ROLES = ["1105601228047654912", "991295146215882872"];
+const MODERATOR_ROLES = ["1331951922848075776", "1158083115781210112", "1288079091211309179", "1105601228047654912", "991295146215882872"];
 
-  const isOwner = perms.owners.includes(message.author.id);
-  const isAdmin = message.member.roles.cache.some(r => perms.admins.includes(r.id));
-  const isModerator = message.member.roles.cache.some(r => perms.moderators.includes(r.id));
+// ======================
+// LOGS CONFIG
+// ======================
+const LOGS_CONFIG = {
+  default: "1416538327682777088",
 
-  if (command.ownerOnly && !isOwner)
-    return message.reply("❌ Commande réservée au owner.");
+  members: "1449361022451187792",
+  roles: "1449361022451187792",
 
-  if (command.adminOnly && !isAdmin && !isOwner)
-    return message.reply("❌ Commande réservée aux admins.");
+  messages: "1449361307399753808",
+  channels: "1449361307399753808",
 
-  if (command.moderatorOnly && !isModerator && !isAdmin && !isOwner)
-    return message.reply("❌ Commande réservée à la modération.");
+  voice: "1449360380097855488",
+  bans: "1449361373514563636",
+};
 
-  try {
-    await command.execute(message, args, client);
-  } catch (err) {
-    console.error(err);
-    message.reply("❌ Une erreur est survenue.");
-  }
-});
-
-/* ======================
-   READY
-====================== */
+// ======================
+// READY
+// ======================
 client.once("ready", () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
@@ -176,9 +103,95 @@ client.once("ready", () => {
     activities: [{ name: "🪬 Shield OFF 🪬", type: ActivityType.Watching }],
     status: "online",
   });
+
+  // Logger
+  require("./logger")(client, LOGS_CONFIG);
+  console.log("📡 Logger multi-salons chargé.");
 });
 
-/* ======================
-   LOGIN
-====================== */
+// ======================
+// COMMANDES
+// ======================
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (!message.content.startsWith(prefix)) return;
+
+  const args = message.content.slice(prefix.length).trim().split(/ +/);
+  const commandName = args.shift().toLowerCase();
+
+  const cmdObj = client.commands.get(commandName);
+  if (!cmdObj) return;
+
+  if (!cmdObj.enabled) {
+    return message.reply("❌ Cette commande est désactivée.");
+  }
+
+  if (cmdObj.command.adminOnly && !ALLOWED_IDS.includes(message.author.id)) {
+    return message.reply("❌ Tu n'as pas la permission.");
+  }
+
+  try {
+    await cmdObj.command.execute(message, args, client);
+  } catch (err) {
+    console.error(err);
+    message.reply("❌ Une erreur est survenue.");
+  }
+});
+
+// ======================
+// PLAINTES (BOUTONS)
+// ======================
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  const { guild, user } = interaction;
+
+  // ➕ Créer une plainte
+  if (interaction.customId === "create_complaint") {
+    try {
+      const existing = guild.channels.cache.find(
+        (c) => c.name === `plainte-${user.id}`
+      );
+      if (existing) {
+        return interaction.reply({
+          content: "❌ Tu as déjà une plainte ouverte.",
+          ephemeral: true,
+        });
+      }
+
+      const channel = await guild.channels.create({
+        name: `plainte-${user.id}`,
+        type: 0,
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: ["ViewChannel"] },
+          { id: user.id, allow: ["ViewChannel", "SendMessages"] },
+        ],
+      });
+
+      await channel.send(`Bienvenue ${user}, ta plainte est créée.`);
+      interaction.reply({ content: "✅ Plainte créée.", ephemeral: true });
+    } catch (err) {
+      console.error(err);
+      interaction.reply({
+        content: "❌ Impossible de créer la plainte.",
+        ephemeral: true,
+      });
+    }
+  }
+
+  // ❌ Fermer une plainte
+  if (interaction.customId === "close_complaint") {
+    try {
+      await interaction.channel.delete();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+});
+
+// ======================
+// LOGIN
+// ======================
 client.login(process.env.TOKEN);
+
+module.exports = client;
