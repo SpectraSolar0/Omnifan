@@ -35,6 +35,8 @@ module.exports = {
       "Mr Justin",
       "Mr Noa",
       "Mr Aldo",
+      "Mlle Gabriel",
+      "Mr Omer",
     ];
 
     // Diviser les boutons en lignes de 5 max
