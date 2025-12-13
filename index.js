@@ -55,9 +55,26 @@ const MODERATOR_IDS = ["1072917862219518042", "1158083115781210112", "1288079091
 const OWNER_IDS = ["991295146215882872"];
 
 // ----------------------
-// SALON DE LOGS
+// LOGS CONFIG (CENTRALISÉ)
 // ----------------------
-const LOG_CHANNEL_ID = "1416538327682777088";
+const LOGS_CONFIG = {
+  // fallback si un type n’est pas trouvé
+  default: "1416538327682777088",
+
+  // 🧑‍🤝‍🧑 Membres + rôles
+  members: "1449361022451187792",
+  roles: "1449361022451187792",
+
+  // 💬 Messages + salons
+  messages: "1449361307399753808",
+  channels: "1449361307399753808",
+
+  // 🔊 Vocal
+  voice: "1449360380097855488",
+
+  // 🔨 Modération lourde
+  bans: "1449361373514563636",
+};
 
 // ----------------------
 // CLIENT PRÊT
