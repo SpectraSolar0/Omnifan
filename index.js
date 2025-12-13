@@ -1,6 +1,3 @@
-Voici mon index.js commet je fait
-
-
 const {
   Client,
   GatewayIntentBits,
