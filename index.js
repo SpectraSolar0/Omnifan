@@ -39,7 +39,8 @@ app.get("/", (_, res) => res.send("Bot actif !"));
 /* ======================
    PERMISSIONS DYNAMIQUES
 ====================== */
-const permissionsFile = "./permissions.json";
+const path = require("path");
+const permissionsFile = path.join(__dirname, "permissions.json");
 
 function loadPermissions() {
   if (!fs.existsSync(permissionsFile)) {
