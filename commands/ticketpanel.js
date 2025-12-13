@@ -3,7 +3,8 @@ const {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
+  EmbedBuilder,  
+  UserSelectMenuBuilder,
   PermissionsBitField
 } = require("discord.js");
 
@@ -163,6 +164,46 @@ module.exports = {
         }
 
         await btn.deferUpdate();
+
+        // ➕ AJOUTER UN UTILISATEUR
+if (btn.customId === "add_user") {
+  const userSelect = new UserSelectMenuBuilder()
+    .setCustomId("add_user_select")
+    .setPlaceholder("👤 Sélectionnez un membre à ajouter")
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  const row = new ActionRowBuilder().addComponents(userSelect);
+
+  const selectMessage = await ticketChannel.send({
+    content:
+      "👮 **Gestion du ticket — Ajout d’un membre**\n\n" +
+      "Veuillez sélectionner le **membre à ajouter à ce ticket**.\n" +
+      "Il pourra lire et écrire dans ce salon.",
+    components: [row]
+  });
+
+  const selectCollector =
+    selectMessage.createMessageComponentCollector({ max: 1 });
+
+  selectCollector.on("collect", async select => {
+    const userId = select.values[0];
+
+    await ticketChannel.permissionOverwrites.edit(userId, {
+      ViewChannel: true,
+      SendMessages: true
+    });
+
+    await select.update({
+      content: "✅ **Le membre a été ajouté au ticket avec succès.**",
+      components: []
+    });
+
+    setTimeout(() => {
+      selectMessage.delete().catch(() => {});
+    }, 3000);
+  });
+}
 
         // FERMER
         if (btn.customId === "close_ticket") {
