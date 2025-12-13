@@ -38,7 +38,7 @@ app.listen(port, () =>
 /* ======================
    PREFIX & COMMANDES
 ====================== */
-const prefix = "/";
+const prefix = "+";
 client.commands = new Map();
 
 if (!fs.existsSync("./commands")) fs.mkdirSync("./commands");
