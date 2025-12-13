@@ -6,17 +6,23 @@ const {
   ActivityType
 } = require("discord.js");
 
-let shieldStatus = false;      // false = désactivé | true = activé
-let panelExists = false;      // empêche plusieurs panels
-let panelMessageId = null;    // ID du panel actif
+let shieldStatus = false;
+let panelExists = false;
+
+const ALLOWED_CHANNEL_ID = "1449195004449914941"; // ⬅️ METS L’ID ICI
 
 module.exports = {
   name: "shield",
   description: "Panel de contrôle du shield",
   adminOnly: true,
-  moderatorOnly: false,
+  moderatorOnly: true,
 
   async execute(message, args) {
+    // ❌ Mauvais salon
+    if (message.channel.id !== ALLOWED_CHANNEL_ID) {
+      return message.reply("❌ Cette commande ne peut être utilisée que dans le salon autorisé.");
+    }
+
     // Vérification des permissions
     if (!message.member.permissions.has("Administrator")) {
       return message.reply("❌ Tu n'as pas la permission d'utiliser cette commande.");
@@ -24,7 +30,7 @@ module.exports = {
 
     // ❌ Panel déjà existant
     if (panelExists) {
-      return message.reply("⚠️ Un **panel shield est déjà actif**. Utilise celui-ci.");
+      return message.reply("⚠️ Un panel shield est déjà actif.");
     }
 
     panelExists = true;
@@ -34,9 +40,8 @@ module.exports = {
 
     const ROLE_NORMAL = "1416853527002873858";
     const ROLE_SHIELD = "1449189420904480959";
-    const ALERT_CHANNEL_ID = "1449190280669429830";
+    const ALERT_CHANNEL_ID = "1449194695996739696";
 
-    // 🧠 UI
     const getEmbed = () =>
       new EmbedBuilder()
         .setTitle("🛡️ SYSTÈME DE SHIELD — PANNEAU DE CONTRÔLE")
@@ -45,9 +50,9 @@ module.exports = {
           `### 📊 Statut du Shield\n` +
           `${shieldStatus ? "🟢 **ACTIVÉ**" : "🔴 **DÉSACTIVÉ**"}\n\n` +
           `### ℹ️ Informations\n` +
-          `• Rôles de sécurité appliqués globalement\n` +
+          `• Panel sécurisé (salon unique)\n` +
           `• Statut du bot synchronisé\n` +
-          `• Panel unique (sécurité renforcée)\n\n` +
+          `• Application globale des rôles\n\n` +
           `### 🎛️ Contrôles\n` +
           `Utilise les boutons ci-dessous pour gérer le shield.`
         )
@@ -69,21 +74,24 @@ module.exports = {
           .setDisabled(!shieldStatus)
       );
 
-    // 📤 Envoi du panel
     const panelMessage = await message.channel.send({
       embeds: [getEmbed()],
       components: [getButtons()]
     });
 
-    panelMessageId = panelMessage.id;
-
-    // 🎛️ Collector
     const collector = panelMessage.createMessageComponentCollector();
 
     collector.on("collect", async interaction => {
+      if (interaction.channel.id !== ALLOWED_CHANNEL_ID) {
+        return interaction.reply({
+          content: "❌ Interaction non autorisée dans ce salon.",
+          ephemeral: true
+        });
+      }
+
       if (!interaction.member.permissions.has("Administrator")) {
         return interaction.reply({
-          content: "❌ Tu n'as pas la permission.",
+          content: "❌ Permission refusée.",
           ephemeral: true
         });
       }
@@ -118,9 +126,9 @@ module.exports = {
             .setColor(0xe74c3c)
             .setDescription(
               "Le serveur est actuellement dans un **état critique**.\n\n" +
-              "🛡️ Le **shield de sécurité** a été activé.\n\n" +
+              "🛡️ Le **shield de sécurité** est activé.\n\n" +
               "👮‍♂️ Le staff est mobilisé et travaille activement.\n\n" +
-              "Merci de rester calme et de respecter les consignes."
+              "Merci de rester calme."
             )
             .setTimestamp();
 
@@ -155,10 +163,8 @@ module.exports = {
       });
     });
 
-    // 🧹 Si le panel est supprimé → autorise un nouveau panel
     collector.on("end", () => {
       panelExists = false;
-      panelMessageId = null;
     });
   }
 };
