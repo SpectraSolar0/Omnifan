@@ -3,138 +3,138 @@ const {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,  
+  EmbedBuilder,
   UserSelectMenuBuilder,
-  PermissionsBitField
+  PermissionsBitField,
+  ChannelType
 } = require("discord.js");
+
+/* ===== CONFIG ===== */
+const PANEL_CHANNEL_ID = "1417933039761363128";
+
+/* RÔLES STAFF (moderatorOnly) */
+const STAFF_ROLES = [
+  "ID_ROLE_MODERATOR",
+  "ID_ROLE_ADMIN"
+];
 
 module.exports = {
   name: "ticket",
-  description: "Système de tickets avec menu déroulant",
+  description: "Panneau de tickets (auto reset)",
   adminOnly: false,
-  moderatorOnly: false,
+  moderatorOnly: true,
   ownerOnly: false,
 
   async execute(message) {
     const guild = message.guild;
 
-    /* ================= EMBED PANEL ================= */
+    /* ===== SALON PANEL ===== */
+    const panelChannel = await guild.channels.fetch(PANEL_CHANNEL_ID);
 
+    /* ===== SUPPRESSION DES ANCIENS PANELS ===== */
+    const messages = await panelChannel.messages.fetch({ limit: 20 });
+
+    const oldPanels = messages.filter(
+      m =>
+        m.author.id === message.client.user.id &&
+        m.components.length > 0
+    );
+
+    for (const msg of oldPanels.values()) {
+      await msg.delete().catch(() => {});
+    }
+
+    /* ===== EMBED PANEL ===== */
     const panelEmbed = new EmbedBuilder()
       .setTitle("🎫 SYSTÈME DE TICKETS — SUPPORT OFFICIEL")
       .setColor(0x5865f2)
       .setDescription(
-        `**Bonjour et bienvenue sur le support du serveur !** 👋\n\n` +
-
-        `Merci d’utiliser notre **système de tickets**.\n` +
-        `Ce système permet de contacter le staff de manière **privée, sécurisée et organisée**.\n\n` +
-
-        `### 📌 Merci de choisir le type de ticket correspondant à votre demande :\n` +
-        `• 🧑‍⚖️ **Plainte contre un joueur**\n` +
-        `• 📢 **Demande média (publication officielle)**\n` +
-        `• ❓ **Autre demande**\n\n` +
-
-        `Un membre du staff vous répondra dès que possible.\n` +
-        `Merci de rester respectueux et précis dans votre demande.`
+        `**Bienvenue sur le support du serveur** 👋\n\n` +
+        `Merci de choisir le type de ticket correspondant à ta demande :\n\n` +
+        `• ⚖️ Plainte contre un joueur\n` +
+        `• 📢 Demande média\n` +
+        `• ❓ Autre demande\n\n` +
+        `Un membre du staff te répondra rapidement.`
       )
-      .setFooter({ text: "Support du serveur — Merci de votre patience" });
+      .setFooter({ text: "Support du serveur" });
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId("ticket_type")
-      .setPlaceholder("📂 Sélectionnez le type de ticket")
+      .setPlaceholder("📂 Sélectionne un type de ticket")
       .addOptions(
         {
           label: "Plainte contre un joueur",
           value: "plainte",
-          description: "Signaler un comportement ou un joueur",
           emoji: "⚖️"
         },
         {
           label: "Demande média",
           value: "media",
-          description: "Demander l'envoi d'un message dans le salon média",
           emoji: "📢"
         },
         {
           label: "Autre demande",
           value: "autre",
-          description: "Toute autre demande ou question",
           emoji: "❓"
         }
       );
 
-    const panelMessage = await message.channel.send({
+    const panelMessage = await panelChannel.send({
       embeds: [panelEmbed],
       components: [new ActionRowBuilder().addComponents(selectMenu)]
     });
 
-    /* ================= COLLECTOR ================= */
-
-    const collector = panelMessage.createMessageComponentCollector();
+    /* ===== COLLECTOR MENU ===== */
+    const collector =
+      panelMessage.createMessageComponentCollector();
 
     collector.on("collect", async interaction => {
-      if (interaction.user.id !== message.author.id) {
-        return interaction.reply({
-          content: "❌ Ce menu ne t’est pas destiné.",
-          ephemeral: true
-        });
-      }
+      if (!interaction.isStringSelectMenu()) return;
 
-      await interaction.deferUpdate();
+      await interaction.deferReply({ ephemeral: true });
 
       const type = interaction.values[0];
       const channelName = `ticket-${type}-${interaction.user.username}`;
 
+      /* ===== CRÉATION DU TICKET ===== */
       const ticketChannel = await guild.channels.create({
         name: channelName,
-        type: 0,
+        type: ChannelType.GuildText,
         permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] },
-          { id: interaction.user.id, allow: ["ViewChannel", "SendMessages"] },
           {
-            id: guild.roles.cache.find(r =>
-              r.permissions.has(PermissionsBitField.Flags.ModerateMembers)
-            )?.id,
+            id: guild.roles.everyone.id,
+            deny: ["ViewChannel"]
+          },
+          {
+            id: interaction.user.id,
             allow: ["ViewChannel", "SendMessages"]
-          }
+          },
+          ...STAFF_ROLES.map(roleId => ({
+            id: roleId,
+            allow: ["ViewChannel", "SendMessages"]
+          }))
         ]
       });
 
-      /* ================= MESSAGE TICKET ================= */
-
-      let ticketText = "";
-
-      if (type === "plainte") {
-        ticketText =
-          `👋 **Bonjour ${interaction.user}**, bienvenue dans ton ticket de **plainte**.\n\n` +
-          `Merci de **décrire précisément la situation** :\n` +
-          `• Nom du joueur concerné\n` +
-          `• Date et heure\n` +
-          `• Preuves (screens, vidéos)\n\n` +
-          `Un modérateur prendra en charge ta demande.`;
-      }
-
-      if (type === "media") {
-        ticketText =
-          `👋 **Bonjour ${interaction.user}**, bienvenue dans ton ticket **demande média**.\n\n` +
-          `Merci d’indiquer **le message exact** que tu souhaites voir publié\n` +
-          `dans le salon **📢 média officiel**.\n\n` +
-          `Le staff vérifiera et validera ta demande.`;
-      }
-
-      if (type === "autre") {
-        ticketText =
-          `👋 **Bonjour ${interaction.user}**, bienvenue dans ton ticket.\n\n` +
-          `Merci d’expliquer clairement ta demande.\n` +
-          `Un membre du staff te répondra rapidement.`;
-      }
+      /* ===== TEXTE DU TICKET ===== */
+      let ticketText = {
+        plainte:
+          `👋 **Bonjour ${interaction.user}**,\n\n` +
+          `Merci de décrire précisément la plainte :\n` +
+          `• Joueur concerné\n• Date & heure\n• Preuves`,
+        media:
+          `👋 **Bonjour ${interaction.user}**,\n\n` +
+          `Merci d’indiquer le message à publier dans le salon média.`,
+        autre:
+          `👋 **Bonjour ${interaction.user}**,\n\n` +
+          `Explique clairement ta demande.`
+      }[type];
 
       const buttonsOpen = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("close_ticket")
           .setLabel("🔒 Fermer")
           .setStyle(ButtonStyle.Danger),
-
         new ButtonBuilder()
           .setCustomId("add_user")
           .setLabel("➕ Ajouter un utilisateur")
@@ -146,15 +146,18 @@ module.exports = {
         components: [buttonsOpen]
       });
 
-      /* ================= BUTTON COLLECTOR ================= */
+      await interaction.editReply({
+        content: `✅ Ton ticket a été créé : ${ticketChannel}`
+      });
 
+      /* ===== COLLECTOR BOUTONS ===== */
       const buttonCollector =
         ticketMsg.createMessageComponentCollector();
 
       buttonCollector.on("collect", async btn => {
         if (
-          !btn.member.permissions.has(
-            PermissionsBitField.Flags.ModerateMembers
+          !btn.member.roles.cache.some(r =>
+            STAFF_ROLES.includes(r.id)
           )
         ) {
           return btn.reply({
@@ -165,83 +168,97 @@ module.exports = {
 
         await btn.deferUpdate();
 
-        // ➕ AJOUTER UN UTILISATEUR
-if (btn.customId === "add_user") {
-  const userSelect = new UserSelectMenuBuilder()
-    .setCustomId("add_user_select")
-    .setPlaceholder("👤 Sélectionnez un membre à ajouter")
-    .setMinValues(1)
-    .setMaxValues(1);
+        /* ➕ AJOUTER UTILISATEUR */
+        if (btn.customId === "add_user") {
+          const userSelect = new UserSelectMenuBuilder()
+            .setCustomId("add_user_select")
+            .setPlaceholder("👤 Choisir un membre")
+            .setMinValues(1)
+            .setMaxValues(1);
 
-  const row = new ActionRowBuilder().addComponents(userSelect);
+          const row =
+            new ActionRowBuilder().addComponents(userSelect);
 
-  const selectMessage = await ticketChannel.send({
-    content:
-      "👮 **Gestion du ticket — Ajout d’un membre**\n\n" +
-      "Veuillez sélectionner le **membre à ajouter à ce ticket**.\n" +
-      "Il pourra lire et écrire dans ce salon.",
-    components: [row]
-  });
+          const selectMessage =
+            await ticketChannel.send({
+              content:
+                "👮 Sélectionnez un membre à ajouter au ticket.",
+              components: [row]
+            });
 
-  const selectCollector =
-    selectMessage.createMessageComponentCollector({ max: 1 });
+          const selectCollector =
+            selectMessage.createMessageComponentCollector({
+              max: 1
+            });
 
-  selectCollector.on("collect", async select => {
-    const userId = select.values[0];
+          selectCollector.on("collect", async select => {
+            const userId = select.values[0];
 
-    await ticketChannel.permissionOverwrites.edit(userId, {
-      ViewChannel: true,
-      SendMessages: true
-    });
+            await ticketChannel.permissionOverwrites.edit(
+              userId,
+              {
+                ViewChannel: true,
+                SendMessages: true
+              }
+            );
 
-    await select.update({
-      content: "✅ **Le membre a été ajouté au ticket avec succès.**",
-      components: []
-    });
+            await select.update({
+              content:
+                "✅ Membre ajouté au ticket avec succès.",
+              components: []
+            });
 
-    setTimeout(() => {
-      selectMessage.delete().catch(() => {});
-    }, 3000);
-  });
-}
+            setTimeout(() => {
+              selectMessage.delete().catch(() => {});
+            }, 3000);
+          });
+        }
 
-        // FERMER
+        /* 🔒 FERMER */
         if (btn.customId === "close_ticket") {
           await ticketChannel.permissionOverwrites.edit(
             interaction.user.id,
             { SendMessages: false }
           );
 
-          const buttonsClosed = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId("open_ticket")
-              .setLabel("🔓 Ouvrir")
-              .setStyle(ButtonStyle.Success),
+          const buttonsClosed =
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId("open_ticket")
+                .setLabel("🔓 Ouvrir")
+                .setStyle(ButtonStyle.Success),
+              new ButtonBuilder()
+                .setCustomId("delete_ticket")
+                .setLabel("🗑️ Supprimer")
+                .setStyle(ButtonStyle.Danger)
+            );
 
-            new ButtonBuilder()
-              .setCustomId("delete_ticket")
-              .setLabel("🗑️ Supprimer")
-              .setStyle(ButtonStyle.Danger)
-          );
-
-          await ticketMsg.edit({ components: [buttonsClosed] });
+          await ticketMsg.edit({
+            components: [buttonsClosed]
+          });
         }
 
-        // OUVRIR
+        /* 🔓 OUVRIR */
         if (btn.customId === "open_ticket") {
           await ticketChannel.permissionOverwrites.edit(
             interaction.user.id,
             { SendMessages: true }
           );
 
-          await ticketMsg.edit({ components: [buttonsOpen] });
+          await ticketMsg.edit({
+            components: [buttonsOpen]
+          });
         }
 
-        // DELETE
+        /* 🗑️ SUPPRIMER */
         if (btn.customId === "delete_ticket") {
           await ticketChannel.delete();
         }
       });
     });
+
+    await message.reply(
+      "✅ Panel de ticket recréé avec succès."
+    );
   }
 };
