@@ -11,7 +11,7 @@ module.exports = {
 
   async execute(message) {
     const embed = new EmbedBuilder()
-      .setTitle("🎫 SYSTÈME DE TICKETS — SUPPORT OFFICIEL")
+      .setTitle("🎫 SUPPORT OFFICIEL")
       .setColor(0x5865f2)
       .setDescription(
         "**Bienvenue sur le support du serveur** 👋\n\n" +
@@ -32,7 +32,7 @@ module.exports = {
         "_Un membre du staff te répondra dès que possible._"
       )
       .setFooter({
-        text: "Support du serveur • Merci de votre patience"
+        text: "TBSD Shield • Merci de votre patience"
       });
 
     const menu = new StringSelectMenuBuilder()
