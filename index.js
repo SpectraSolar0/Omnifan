@@ -141,6 +141,24 @@ client.on("messageCreate", async (message) => {
 });
 
 /* ======================
+   INTERACTIONS (BOUTONS / MENUS)
+====================== */
+client.on("interactionCreate", async (interaction) => {
+  try {
+    require("./interactionCreate")(interaction, client);
+  } catch (err) {
+    console.error("❌ Erreur interactionCreate :", err);
+
+    if (interaction.isRepliable()) {
+      interaction.reply({
+        content: "❌ Une erreur est survenue.",
+        ephemeral: true,
+      }).catch(() => {});
+    }
+  }
+});
+
+/* ======================
    LOGIN
 ====================== */
 client.login(process.env.TOKEN);
